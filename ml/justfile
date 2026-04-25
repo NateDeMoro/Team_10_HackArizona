@@ -1,0 +1,28 @@
+set dotenv-load := true
+
+# Tier 0 smoke test: imports + invokes every stub
+no-op:
+    uv run python -m pipeline.no_op
+
+# Tier 1
+ingest-labels:
+    uv run python -m pipeline.ingest_nrc
+
+# Tier 2
+features:
+    uv run python -m pipeline.ingest_weather
+    uv run python -m pipeline.ingest_usgs
+    uv run python -m pipeline.ingest_eia
+    uv run python -m pipeline.features
+    uv run python -m pipeline.build_dataset
+
+# Tier 3
+train:
+    uv run python -m pipeline.train
+
+# Tier 4
+backtest:
+    uv run python -m pipeline.backtest
+
+forecast:
+    uv run python -m pipeline.inference

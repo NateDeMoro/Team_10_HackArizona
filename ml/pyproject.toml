@@ -1,0 +1,19 @@
+[project]
+name = "derating-ml"
+version = "0.1.0"
+description = "Offline pipeline for derating forecast model"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas>=2.2",
+    "pyarrow>=18.0",
+    "numpy>=2.1",
+    "requests>=2.32",
+    "python-dotenv>=1.0",
+    "xgboost>=2.1",
+    "scikit-learn>=1.5",
+    "matplotlib>=3.9",
+    "shap>=0.46",
+]
+
+[tool.uv]
+package = false
