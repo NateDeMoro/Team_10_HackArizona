@@ -138,17 +138,6 @@ export default async function Home() {
         </ul>
       </section>
 
-      <footer className="mt-auto border-t-2 border-[var(--ua-red)]/30 pt-6 text-xs text-[var(--ua-navy)]/70">
-        <strong className="text-[var(--ua-navy)]">
-          What&apos;s honest, what isn&apos;t:
-        </strong>{" "}
-        Forecasts come from public weather (Open-Meteo) and water (USGS)
-        data and a gradient-boosted regression trained on NRC daily power
-        status. The model targets weather-driven derating only — refueling
-        outages and pre-outage coastdown days are excluded from training.
-        Backtests on 2023+ are honest, but are not a substitute for an
-        operator&apos;s own thermal-discharge analysis.
-      </footer>
     </main>
   );
 }
