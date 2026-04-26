@@ -116,6 +116,18 @@ export type BacktestDatesResponse = {
   highlights: string[];
 };
 
+export type BacktestSeriesPoint = {
+  date: string;
+  actual_pct: number | null;
+  point_pct: number;
+};
+
+export type BacktestSeriesResponse = {
+  plant_id: string;
+  horizon_days: number;
+  points: BacktestSeriesPoint[];
+};
+
 // --- Health ---------------------------------------------------------------
 
 export type Health = { status: string };
@@ -172,4 +184,13 @@ export const getBacktestDates = (plantId: string) =>
 export const getBacktest = (plantId: string, asOf: string) =>
   getJson<BacktestResponse>(
     `/plants/${encodeURIComponent(plantId)}/backtest?as_of=${asOf}`,
+  );
+
+export const getBacktestSeries = (
+  plantId: string,
+  horizon: number,
+  days: number,
+) =>
+  getJson<BacktestSeriesResponse>(
+    `/plants/${encodeURIComponent(plantId)}/backtest/series?horizon=${horizon}&days=${days}`,
   );

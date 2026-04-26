@@ -37,6 +37,7 @@ import pandas as pd
 import xgboost as xgb
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from plants import PLANTS, Plant, get_plant  # noqa: E402
 from schemas import (  # noqa: E402
     CATEGORICAL_FEATURES,
     DIP_THRESHOLD_PCT,
@@ -52,15 +53,9 @@ from pipeline import baselines, inference  # noqa: E402
 
 log = logging.getLogger(__name__)
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]  # ml/ (data lives at ml/data/)
 PROCESSED_DIR = REPO_ROOT / "data" / "processed"
 ARTIFACTS_DIR = REPO_ROOT / "data" / "artifacts"
-
-# v1 backtest is single-plant (matches inference). Multi-plant backtest
-# is a separate task; the pipeline already trains arbitrary plants.
-_PLANT_SLUG = inference.PLANT_QC1
-_PLANT_PROCESSED_DIR = PROCESSED_DIR / _PLANT_SLUG
-_PLANT_ARTIFACTS_DIR = ARTIFACTS_DIR / _PLANT_SLUG
 
 
 def _feature_cols(df: pd.DataFrame) -> list[str]:
@@ -141,16 +136,21 @@ def _detection_metrics(
 # ---------- main ---------------------------------------------------------
 
 
-def run() -> None:
-    src = _PLANT_PROCESSED_DIR / "training_dataset.parquet"
+def run(plant_id: str) -> None:
+    if plant_id not in PLANTS:
+        raise ValueError(f"unknown plant_id={plant_id!r}; known: {sorted(PLANTS)}")
+    plant_processed_dir = PROCESSED_DIR / plant_id
+    plant_artifacts_dir = ARTIFACTS_DIR / plant_id
+
+    src = plant_processed_dir / "training_dataset.parquet"
     if not src.exists():
-        raise FileNotFoundError(f"missing {src}; run `just features {_PLANT_SLUG}` first")
+        raise FileNotFoundError(f"missing {src}; run `just features {plant_id}` first")
     raw = pd.read_parquet(src)
     raw["date"] = pd.to_datetime(raw["date"]).dt.tz_localize(None).dt.normalize()
     raw = _coerce_categoricals(raw)
 
     feat_cols = _feature_cols(raw)
-    deltas = inference._load_band_deltas()  # noqa: SLF001 — internal-use helper
+    deltas = inference._load_band_deltas(plant_id)  # noqa: SLF001 — internal-use helper
 
     rows: list[dict] = []
     horizon_blocks: dict[str, dict] = {}
@@ -166,8 +166,15 @@ def run() -> None:
         y_test = test["target"].to_numpy(dtype=float)
         target_dates = pd.to_datetime(test["date"]) + pd.Timedelta(days=h)
 
-        point = _load_booster(_PLANT_ARTIFACTS_DIR / f"model_h{h:02d}_point.json")
-        point_pred = point.predict(X_test)
+        point = _load_booster(plant_artifacts_dir / f"model_h{h:02d}_point.json")
+        cal_path = plant_artifacts_dir / f"calibrator_h{h:02d}.json"
+        if not cal_path.exists():
+            raise FileNotFoundError(
+                f"missing calibrator for h={h}; run `just train {plant_id}` first"
+            )
+        calibrator = inference._load_calibrator(cal_path)  # noqa: SLF001
+        raw_pred = point.predict(X_test)
+        point_pred = inference._apply_calibrator(raw_pred, calibrator)  # noqa: SLF001
         delta_h = float(deltas[f"h{h:02d}"]["delta_pct"])
         band_low_pred = np.clip(point_pred - delta_h, 0.0, 100.0)
         band_high_pred = np.clip(point_pred + delta_h, 0.0, 100.0)
@@ -243,7 +250,7 @@ def run() -> None:
 
     # Write per-row predictions for the UI/replay layer.
     results_df = pd.DataFrame(rows)
-    results_path = _PLANT_ARTIFACTS_DIR / "backtest_results.parquet"
+    results_path = plant_artifacts_dir / "backtest_results.parquet"
     results_df.to_parquet(results_path, index=False)
     log.info("wrote %s (%d rows)", results_path, len(results_df))
 
@@ -251,16 +258,17 @@ def run() -> None:
     # exercises the conformal-calibrated q10 + q10<=point clamp the API
     # actually serves, and compares to realized power for the following 14
     # days. These are the demo highlights.
-    highlights = _historical_highlights(raw)
+    highlights = _historical_highlights(plant_id, raw)
 
     # Write the human-readable report.
-    report = _format_report(horizon_blocks, highlights)
-    report_path = _PLANT_ARTIFACTS_DIR / "backtest_report.md"
+    plant = get_plant(plant_id)
+    report = _format_report(plant, horizon_blocks, highlights)
+    report_path = plant_artifacts_dir / "backtest_report.md"
     report_path.write_text(report)
     log.info("wrote %s", report_path)
 
     # Also stash the structured block alongside metrics.json for tooling.
-    backtest_json_path = _PLANT_ARTIFACTS_DIR / "backtest_metrics.json"
+    backtest_json_path = plant_artifacts_dir / "backtest_metrics.json"
     backtest_json_path.write_text(
         json.dumps(
             {"horizons": horizon_blocks, "historical_highlights": highlights},
@@ -271,7 +279,7 @@ def run() -> None:
     log.info("wrote %s", backtest_json_path)
 
 
-def _historical_highlights(raw: pd.DataFrame) -> list[dict]:
+def _historical_highlights(plant_id: str, raw: pd.DataFrame) -> list[dict]:
     """Run forecast() on the named historical dates, compare to realized.
 
     Each entry is one (run_date, [horizons]) record with realized power
@@ -287,7 +295,7 @@ def _historical_highlights(raw: pd.DataFrame) -> list[dict]:
     for d_str in HISTORICAL_BACKTEST_DATES:
         run_date = pd.Timestamp(d_str).date()
         try:
-            resp = inference.forecast(inference.PLANT_QC1, run_date)
+            resp = inference.forecast(plant_id, run_date)
         except LookupError as exc:
             log.warning("skipping %s: %s", d_str, exc)
             continue
@@ -317,11 +325,11 @@ def _historical_highlights(raw: pd.DataFrame) -> list[dict]:
 
 
 def _format_report(
-    blocks: dict[str, dict], highlights: list[dict] | None = None
+    plant: Plant, blocks: dict[str, dict], highlights: list[dict] | None = None
 ) -> str:
     """Compose the dip-focused markdown report."""
     lines: list[str] = []
-    lines.append("# Backtest report — Quad Cities 1, dip-focused")
+    lines.append(f"# Backtest report — {plant.display_name}, dip-focused")
     lines.append("")
     lines.append(
         f"Held-out test split (>{VAL_END}). Dip threshold: <{DIP_THRESHOLD_PCT}% "
@@ -454,8 +462,14 @@ def _main() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.parse_args()
-    run()
+    parser.add_argument(
+        "--plant",
+        required=True,
+        choices=sorted(PLANTS),
+        help="Plant slug from ml/plants.py.",
+    )
+    args = parser.parse_args()
+    run(args.plant)
 
 
 if __name__ == "__main__":

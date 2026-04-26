@@ -6,10 +6,17 @@ import { CircleMarker, MapContainer, Popup, TileLayer } from "react-leaflet";
 import type { AlertLevel, Plant } from "@/lib/api";
 import { ALERT_COPY, ALERT_HEX } from "@/lib/format";
 
+// One per modeled plant; absent when the forecast endpoint failed for
+// that plant. The map shows placeholder grey for unmodeled plants and
+// for modeled plants whose forecast didn't load.
+export type PlantSummary = {
+  level: AlertLevel;
+  pointPct: number;
+};
+
 type Props = {
   plants: Plant[];
-  qcAlertLevel: AlertLevel | null;
-  qcPointPct: number | null;
+  summaries: Record<string, PlantSummary>;
 };
 
 // Continental US bounds; zoom 4 fits CONUS comfortably without showing
@@ -19,7 +26,7 @@ const ZOOM = 4;
 
 const PLACEHOLDER_HEX = "#9ca3af"; // zinc-400
 
-export default function PlantMap({ plants, qcAlertLevel, qcPointPct }: Props) {
+export default function PlantMap({ plants, summaries }: Props) {
   return (
     <MapContainer
       center={CENTER}
@@ -37,8 +44,8 @@ export default function PlantMap({ plants, qcAlertLevel, qcPointPct }: Props) {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       {plants.map((plant) => {
-        const live = plant.modeled && qcAlertLevel != null;
-        const color = live ? ALERT_HEX[qcAlertLevel] : PLACEHOLDER_HEX;
+        const summary = plant.modeled ? summaries[plant.id] : undefined;
+        const color = summary ? ALERT_HEX[summary.level] : PLACEHOLDER_HEX;
         return (
           <CircleMarker
             key={plant.id}
@@ -59,15 +66,13 @@ export default function PlantMap({ plants, qcAlertLevel, qcPointPct }: Props) {
                 </p>
                 {plant.modeled ? (
                   <>
-                    {qcAlertLevel ? (
+                    {summary ? (
                       <p>
                         7-day risk:{" "}
                         <span style={{ color }} className="font-medium">
-                          {ALERT_COPY[qcAlertLevel]}
+                          {ALERT_COPY[summary.level]}
                         </span>
-                        {qcPointPct != null
-                          ? ` (${qcPointPct.toFixed(1)}%)`
-                          : ""}
+                        {` (${summary.pointPct.toFixed(1)}%)`}
                       </p>
                     ) : null}
                     <Link

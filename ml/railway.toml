@@ -1,0 +1,8 @@
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Daily at 07:00 UTC. Cron jobs should not auto-restart on completion.
+cronSchedule = "0 7 * * *"
+restartPolicyType = "NEVER"

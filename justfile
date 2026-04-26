@@ -24,13 +24,14 @@ features plant="quad_cities_1":
 train plant="quad_cities_1":
     cd ml && just train {{plant}}
 
-# Tier 4 backtest (still QC-only)
-backtest:
-    cd ml && just backtest
+# Tier 4 backtest. `just backtest byron_1` for a non-default plant.
+backtest plant="quad_cities_1":
+    cd ml && just backtest {{plant}}
 
-# Tier 4 forecast: refresh the precomputed JSON the API serves (still QC-only)
-forecast:
-    cd ml && just forecast
+# Tier 4 forecast: refresh the precomputed JSON the API serves.
+# `just forecast byron_1` for a non-default plant.
+forecast plant="quad_cities_1":
+    cd ml && just forecast {{plant}}
 
 # Lint api + web
 lint:

@@ -15,6 +15,7 @@ dependencies = [
     "shap>=0.46",
     "openpyxl>=3.1",
     "pydantic>=2.9",
+    "psycopg[binary]>=3.2",
 ]
 
 [tool.uv]

@@ -3,71 +3,74 @@ import { notFound } from "next/navigation";
 
 import { AlertBadge } from "@/components/AlertBadge";
 import { AttributionBars } from "@/components/AttributionBars";
-import { ForecastChart } from "@/components/ForecastChart";
+import { ForecastView } from "@/components/ForecastView";
+import { HistoryView } from "@/components/HistoryView";
 import { InputsPanel } from "@/components/InputsPanel";
-import { ReplaySlider } from "@/components/ReplaySlider";
 import {
-  getActuals,
   getAttributions,
-  getBacktestDates,
   getForecast,
   getInputs,
   getPlant,
-  type ActualsResponse,
   type AttributionsResponse,
-  type BacktestDatesResponse,
   type ForecastResponse,
   type InputsResponse,
   type Plant,
 } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 type Params = Promise<{ id: string }>;
+type SearchParams = Promise<{ view?: string }>;
+
+type View = "forecast" | "history";
+
+function parseView(raw: string | undefined): View {
+  return raw === "history" ? "history" : "forecast";
+}
 
 type DetailData = {
   plant: Plant;
   forecast: ForecastResponse | null;
-  actuals: ActualsResponse | null;
   inputs: InputsResponse | null;
   attributions: AttributionsResponse | null;
-  backtestDates: BacktestDatesResponse | null;
 };
 
 async function fetchDetail(id: string): Promise<DetailData> {
   const plant = await getPlant(id);
   if (!plant.modeled) {
-    return {
-      plant,
-      forecast: null,
-      actuals: null,
-      inputs: null,
-      attributions: null,
-      backtestDates: null,
-    };
+    return { plant, forecast: null, inputs: null, attributions: null };
   }
-  // Fetch all five datasets in parallel; tolerate individual failures so
-  // the page still renders the parts that loaded.
-  const [forecast, actuals, inputs, attributions, backtestDates] = await Promise.all([
+  // Fetch the static datasets in parallel; tolerate individual failures
+  // so the page still renders the parts that loaded. The History view
+  // owns its own actuals/backtest fetches because they vary with window.
+  const [forecast, inputs, attributions] = await Promise.all([
     getForecast(id).catch(() => null),
-    getActuals(id, 30).catch(() => null),
     getInputs(id, 30).catch(() => null),
     getAttributions(id).catch(() => null),
-    getBacktestDates(id).catch(() => null),
   ]);
-  return { plant, forecast, actuals, inputs, attributions, backtestDates };
+  return { plant, forecast, inputs, attributions };
 }
 
-export default async function PlantDetail({ params }: { params: Params }) {
+export default async function PlantDetail({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   const { id } = await params;
+  const { view: rawView } = await searchParams;
+  const view = parseView(rawView);
+
   let data: DetailData;
   try {
     data = await fetchDetail(id);
   } catch {
     notFound();
   }
-  const { plant, forecast, actuals, inputs, attributions, backtestDates } = data;
+  const { plant, forecast, inputs, attributions } = data;
 
   const headlineHorizon =
     forecast?.horizons.find((h) => h.horizon_days === 7) ?? forecast?.horizons[0];
@@ -131,24 +134,25 @@ export default async function PlantDetail({ params }: { params: Params }) {
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-4">
         <div className="rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm lg:col-span-3">
-          <div className="mb-3 flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold text-[var(--ua-navy)]">
-              14-day forecast
-            </h2>
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <ViewToggle plantId={plant.id} active={view} />
             {forecast ? (
               <span className="text-xs text-[var(--ua-navy)]/60">
                 Run {fmtDate(forecast.run_date)} · source {forecast.source}
               </span>
             ) : null}
           </div>
-          {forecast && actuals ? (
-            <ForecastChart
-              actuals={actuals.points}
-              forecast={forecast.horizons}
-              runDate={forecast.run_date}
-            />
+          {view === "forecast" ? (
+            forecast ? (
+              <ForecastView
+                forecast={forecast.horizons}
+                runDate={forecast.run_date}
+              />
+            ) : (
+              <NoData label="forecast cache" />
+            )
           ) : (
-            <NoData label="forecast cache" />
+            <HistoryView plantId={plant.id} />
           )}
         </div>
         <aside className="rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm">
@@ -183,36 +187,43 @@ export default async function PlantDetail({ params }: { params: Params }) {
         )}
       </section>
 
-      <section className="rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="text-sm font-semibold text-[var(--ua-navy)]">
-            Replay backtest
-          </h2>
-          <span className="text-xs text-[var(--ua-navy)]/60">
-            Predicted-vs-realized at every horizon, anchored at a chosen
-            run date
-          </span>
-        </div>
-        {backtestDates && backtestDates.dates.length > 0 ? (
-          <ReplaySlider
-            plantId={plant.id}
-            dates={backtestDates.dates}
-            highlights={backtestDates.highlights}
-          />
-        ) : (
-          <NoData label="backtest cache" />
-        )}
-      </section>
-
       <footer className="border-t-2 border-[var(--ua-red)]/30 pt-6 text-xs text-[var(--ua-navy)]/70">
-        Symmetric uncertainty band is the per-horizon 80th-percentile of
-        absolute validation residuals (target ~80% empirical coverage).
         Forecast curves above 95% mean the model expects no weather-driven
-        derating; values below 90% trigger the red alert tier. Refueling
-        outage and pre-outage days are excluded from the actuals series to
-        avoid burying the weather signal under operations.
+        derating and are clamped to 100% on the chart; values below 90%
+        trigger the red alert tier. Refueling outage and pre-outage days
+        are excluded from the actuals series to avoid burying the weather
+        signal under operations.
       </footer>
     </main>
+  );
+}
+
+function ViewToggle({ plantId, active }: { plantId: string; active: View }) {
+  const items: { view: View; label: string }[] = [
+    { view: "forecast", label: "Forecast" },
+    { view: "history", label: "History" },
+  ];
+  return (
+    <div className="inline-flex overflow-hidden rounded-md border border-[var(--ua-navy)]/20 text-sm">
+      {items.map(({ view, label }) => {
+        const href = `/plants/${plantId}${view === "forecast" ? "" : "?view=history"}`;
+        const isActive = view === active;
+        return (
+          <Link
+            key={view}
+            href={href}
+            className={cn(
+              "px-3 py-1.5 font-medium transition",
+              isActive
+                ? "bg-[var(--ua-navy)] text-white"
+                : "bg-white text-[var(--ua-navy)] hover:bg-[var(--ua-navy)]/[0.05]",
+            )}
+          >
+            {label}
+          </Link>
+        );
+      })}
+    </div>
   );
 }
 

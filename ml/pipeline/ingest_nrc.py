@@ -41,10 +41,10 @@ from schemas import (  # noqa: E402
 
 log = logging.getLogger(__name__)
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]  # ml/ (data lives at ml/data/)
 RAW_DIR = REPO_ROOT / "data" / "raw" / "nrc"
 INTERIM_DIR = REPO_ROOT / "data" / "interim"
-FIGURES_DIR = REPO_ROOT / "ml" / "notebooks" / "figures"
+FIGURES_DIR = REPO_ROOT / "notebooks" / "figures"  # was REPO_ROOT/ml/notebooks/figures
 
 NRC_URL = (
     "https://www.nrc.gov/reading-rm/doc-collections/event-status/"

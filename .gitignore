@@ -14,8 +14,15 @@ out/
 .pnpm-store/
 *.tsbuildinfo
 
-# Data artifacts
-data/
+# Data lives under ml/ — only the ml service reads it on disk.
+# Raw + processed regenerate from refresher runs; not tracked.
+ml/data/raw/
+ml/data/processed/
+# Dynamic forecast outputs live in Postgres (refresher uploads on cron).
+# Static artifacts (boosters, calibrators, backtest history, interim parquet)
+# ARE tracked so the ml image has them at deploy time.
+ml/data/artifacts/*/forecast_latest.json
+ml/data/artifacts/*/attributions_latest.json
 
 # Env (keep .env.example)
 .env

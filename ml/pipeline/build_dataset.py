@@ -27,7 +27,7 @@ from plants import PLANTS, Plant, get_plant  # noqa: E402
 
 log = logging.getLogger(__name__)
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]  # ml/ (data lives at ml/data/)
 INTERIM_DIR = REPO_ROOT / "data" / "interim"
 PROCESSED_DIR = REPO_ROOT / "data" / "processed"
 

@@ -1,0 +1,1259 @@
+{
+  "horizons": {
+    "h01": {
+      "n_test_rows": 1026,
+      "n_dip_rows": 25,
+      "n_summer_dip_rows": 2,
+      "dip_events": {
+        "n": 25,
+        "model_mae": 17.91150939941406,
+        "clim_mae": 20.752592074592073,
+        "persist_mae": 20.4
+      },
+      "summer_dip_events": {
+        "n": 2,
+        "model_mae": 29.017105102539062,
+        "clim_mae": 38.166666666666664,
+        "persist_mae": 43.0
+      },
+      "detection": {
+        "point": {
+          "tp": 19,
+          "fp": 560,
+          "fn": 6,
+          "tn": 441,
+          "precision": 0.03281519861830743,
+          "recall": 0.76,
+          "f1": 0.06291390728476821
+        },
+        "band_low": {
+          "tp": 25,
+          "fp": 1001,
+          "fn": 0,
+          "tn": 0,
+          "precision": 0.024366471734892786,
+          "recall": 1.0,
+          "f1": 0.047573739295908656
+        }
+      },
+      "band": {
+        "method": "symmetric_residual_band",
+        "delta_pct": 7.646261278970421,
+        "empirical_coverage": 0.7319688109161794
+      }
+    },
+    "h02": {
+      "n_test_rows": 1022,
+      "n_dip_rows": 23,
+      "n_summer_dip_rows": 3,
+      "dip_events": {
+        "n": 23,
+        "model_mae": 19.350852966308594,
+        "clim_mae": 17.761791831357048,
+        "persist_mae": 22.347826086956523
+      },
+      "summer_dip_events": {
+        "n": 3,
+        "model_mae": 29.16027577718099,
+        "clim_mae": 28.11111111111111,
+        "persist_mae": 33.333333333333336
+      },
+      "detection": {
+        "point": {
+          "tp": 4,
+          "fp": 286,
+          "fn": 19,
+          "tn": 713,
+          "precision": 0.013793103448275862,
+          "recall": 0.17391304347826086,
+          "f1": 0.025559105431309903
+        },
+        "band_low": {
+          "tp": 23,
+          "fp": 999,
+          "fn": 0,
+          "tn": 0,
+          "precision": 0.022504892367906065,
+          "recall": 1.0,
+          "f1": 0.04401913875598086
+        }
+      },
+      "band": {
+        "method": "symmetric_residual_band",
+        "delta_pct": 5.572379059363051,
+        "empirical_coverage": 0.7436399217221135
+      }
+    },
+    "h03": {
+      "n_test_rows": 1018,
+      "n_dip_rows": 22,
+      "n_summer_dip_rows": 4,
+      "dip_events": {
+        "n": 22,
+        "model_mae": 17.753850763494317,
+        "clim_mae": 18.19228650137741,
+        "persist_mae": 19.727272727272727
+      },
+      "summer_dip_events": {
+        "n": 4,
+        "model_mae": 21.752487182617188,
+        "clim_mae": 24.75,
+        "persist_mae": 26.75
+      },
+      "detection": {
+        "point": {
+          "tp": 5,
+          "fp": 210,
+          "fn": 17,
+          "tn": 786,
+          "precision": 0.023255813953488372,
+          "recall": 0.22727272727272727,
+          "f1": 0.04219409282700422
+        },
+        "band_low": {
+          "tp": 5,
+          "fp": 210,
+          "fn": 17,
+          "tn": 786,
+          "precision": 0.023255813953488372,
+          "recall": 0.22727272727272727,
+          "f1": 0.04219409282700422
+        }
+      },
+      "band": {
+        "method": "symmetric_residual_band",
+        "delta_pct": 0.49773406982421875,
+        "empirical_coverage": 0.768172888015717
+      }
+    },
+    "h04": {
+      "n_test_rows": 1014,
+      "n_dip_rows": 22,
+      "n_summer_dip_rows": 4,
+      "dip_events": {
+        "n": 22,
+        "model_mae": 17.99939554387873,
+        "clim_mae": 18.25123966942149,
+        "persist_mae": 21.0
+      },
+      "summer_dip_events": {
+        "n": 4,
+        "model_mae": 26.338762283325195,
+        "clim_mae": 25.383333333333333,
+        "persist_mae": 30.0
+      },
+      "detection": {
+        "point": {
+          "tp": 6,
+          "fp": 228,
+          "fn": 16,
+          "tn": 764,
+          "precision": 0.02564102564102564,
+          "recall": 0.2727272727272727,
+          "f1": 0.04687499999999999
+        },
+        "band_low": {
+          "tp": 6,
+          "fp": 228,
+          "fn": 16,
+          "tn": 764,
+          "precision": 0.02564102564102564,
+          "recall": 0.2727272727272727,
+          "f1": 0.04687499999999999
+        }
+      },
+      "band": {
+        "method": "symmetric_residual_band",
+        "delta_pct": 1.4658276495805467,
+        "empirical_coverage": 0.7514792899408284
+      }
+    },
+    "h05": {
+      "n_test_rows": 1010,
+      "n_dip_rows": 22,
+      "n_summer_dip_rows": 4,
+      "dip_events": {
+        "n": 22,
+        "model_mae": 18.88883451981978,
+        "clim_mae": 19.028787878787874,
+        "persist_mae": 23.40909090909091
+      },
+      "summer_dip_events": {
+        "n": 4,
+        "model_mae": 27.739521026611328,
+        "clim_mae": 26.616666666666664,
+        "persist_mae": 30.0
+      },
+      "detection": {
+        "point": {
+          "tp": 6,
+          "fp": 254,
+          "fn": 16,
+          "tn": 734,
+          "precision": 0.023076923076923078,
+          "recall": 0.2727272727272727,
+          "f1": 0.0425531914893617
+        },
+        "band_low": {
+          "tp": 22,
+          "fp": 988,
+          "fn": 0,
+          "tn": 0,
+          "precision": 0.02178217821782178,
+          "recall": 1.0,
+          "f1": 0.04263565891472868
+        }
+      },
+      "band": {
+        "method": "symmetric_residual_band",
+        "delta_pct": 5.746441564075327,
+        "empirical_coverage": 0.7653465346534654
+      }
+    },
+    "h06": {
+      "n_test_rows": 1006,
+      "n_dip_rows": 22,
+      "n_summer_dip_rows": 4,
+      "dip_events": {
+        "n": 22,
+        "model_mae": 19.160778392444957,
+        "clim_mae": 19.015013774104684,
+        "persist_mae": 24.59090909090909
+      },
+      "summer_dip_events": {
+        "n": 4,
+        "model_mae": 22.667837142944336,
+        "clim_mae": 28.433333333333334,
+        "persist_mae": 30.0
+      },
+      "detection": {
+        "point": {
+          "tp": 5,
+          "fp": 232,
+          "fn": 17,
+          "tn": 752,
+          "precision": 0.02109704641350211,
+          "recall": 0.22727272727272727,
+          "f1": 0.03861003861003861
+        },
+        "band_low": {
+          "tp": 22,
+          "fp": 984,
+          "fn": 0,
+          "tn": 0,
+          "precision": 0.02186878727634195,
+          "recall": 1.0,
+          "f1": 0.04280155642023347
+        }
+      },
+      "band": {
+        "method": "symmetric_residual_band",
+        "delta_pct": 5.136839890434282,
+        "empirical_coverage": 0.7524850894632207
+      }
+    },
+    "h07": {
+      "n_test_rows": 1002,
+      "n_dip_rows": 21,
+      "n_summer_dip_rows": 4,
+      "dip_events": {
+        "n": 21,
+        "model_mae": 18.69712357293992,
+        "clim_mae": 19.631890331890332,
+        "persist_mae": 21.142857142857142
+      },
+      "summer_dip_events": {
+        "n": 4,
+        "model_mae": 26.26069450378418,
+        "clim_mae": 28.28333333333333,
+        "persist_mae": 30.0
+      },
+      "detection": {
+        "point": {
+          "tp": 5,
+          "fp": 297,
+          "fn": 16,
+          "tn": 684,
+          "precision": 0.016556291390728478,
+          "recall": 0.23809523809523808,
+          "f1": 0.030959752321981424
+        },
+        "band_low": {
+          "tp": 21,
+          "fp": 981,
+          "fn": 0,
+          "tn": 0,
+          "precision": 0.020958083832335328,
+          "recall": 1.0,
+          "f1": 0.04105571847507331
+        }
+      },
+      "band": {
+        "method": "symmetric_residual_band",
+        "delta_pct": 5.990183211884513,
+        "empirical_coverage": 0.7744510978043913
+      }
+    },
+    "h08": {
+      "n_test_rows": 998,
+      "n_dip_rows": 21,
+      "n_summer_dip_rows": 4,
+      "dip_events": {
+        "n": 21,
+        "model_mae": 18.854525292515063,
+        "clim_mae": 19.58369408369408,
+        "persist_mae": 21.142857142857142
+      },
+      "summer_dip_events": {
+        "n": 4,
+        "model_mae": 29.303932189941406,
+        "clim_mae": 28.349999999999998,
+        "persist_mae": 30.0
+      },
+      "detection": {
+        "point": {
+          "tp": 4,
+          "fp": 326,
+          "fn": 17,
+          "tn": 651,
+          "precision": 0.012121212121212121,
+          "recall": 0.19047619047619047,
+          "f1": 0.022792022792022793
+        },
+        "band_low": {
+          "tp": 21,
+          "fp": 977,
+          "fn": 0,
+          "tn": 0,
+          "precision": 0.021042084168336674,
+          "recall": 1.0,
+          "f1": 0.04121687929342492
+        }
+      },
+      "band": {
+        "method": "symmetric_residual_band",
+        "delta_pct": 5.92365925862239,
+        "empirical_coverage": 0.7254509018036072
+      }
+    },
+    "h09": {
+      "n_test_rows": 994,
+      "n_dip_rows": 21,
+      "n_summer_dip_rows": 4,
+      "dip_events": {
+        "n": 21,
+        "model_mae": 18.46219925653367,
+        "clim_mae": 19.753679653679654,
+        "persist_mae": 21.142857142857142
+      },
+      "summer_dip_events": {
+        "n": 4,
+        "model_mae": 24.218502044677734,
+        "clim_mae": 27.316666666666666,
+        "persist_mae": 30.0
+      },
+      "detection": {
+        "point": {
+          "tp": 9,
+          "fp": 313,
+          "fn": 12,
+          "tn": 660,
+          "precision": 0.027950310559006212,
+          "recall": 0.42857142857142855,
+          "f1": 0.05247813411078717
+        },
+        "band_low": {
+          "tp": 21,
+          "fp": 973,
+          "fn": 0,
+          "tn": 0,
+          "precision": 0.02112676056338028,
+          "recall": 1.0,
+          "f1": 0.041379310344827586
+        }
+      },
+      "band": {
+        "method": "symmetric_residual_band",
+        "delta_pct": 6.544068800014756,
+        "empirical_coverage": 0.7706237424547284
+      }
+    },
+    "h10": {
+      "n_test_rows": 991,
+      "n_dip_rows": 22,
+      "n_summer_dip_rows": 4,
+      "dip_events": {
+        "n": 22,
+        "model_mae": 19.054212050004438,
+        "clim_mae": 22.739876033057854,
+        "persist_mae": 24.136363636363637
+      },
+      "summer_dip_events": {
+        "n": 4,
+        "model_mae": 19.623266220092773,
+        "clim_mae": 28.283333333333335,
+        "persist_mae": 30.0
+      },
+      "detection": {
+        "point": {
+          "tp": 9,
+          "fp": 294,
+          "fn": 13,
+          "tn": 675,
+          "precision": 0.0297029702970297,
+          "recall": 0.4090909090909091,
+          "f1": 0.055384615384615386
+        },
+        "band_low": {
+          "tp": 22,
+          "fp": 969,
+          "fn": 0,
+          "tn": 0,
+          "precision": 0.022199798183652877,
+          "recall": 1.0,
+          "f1": 0.04343534057255677
+        }
+      },
+      "band": {
+        "method": "symmetric_residual_band",
+        "delta_pct": 6.785253903309964,
+        "empirical_coverage": 0.7941473259334006
+      }
+    },
+    "h11": {
+      "n_test_rows": 988,
+      "n_dip_rows": 22,
+      "n_summer_dip_rows": 4,
+      "dip_events": {
+        "n": 22,
+        "model_mae": 19.74329237504439,
+        "clim_mae": 22.52603305785124,
+        "persist_mae": 24.136363636363637
+      },
+      "summer_dip_events": {
+        "n": 4,
+        "model_mae": 25.276437759399414,
+        "clim_mae": 26.8,
+        "persist_mae": 30.0
+      },
+      "detection": {
+        "point": {
+          "tp": 11,
+          "fp": 326,
+          "fn": 11,
+          "tn": 640,
+          "precision": 0.032640949554896145,
+          "recall": 0.5,
+          "f1": 0.061281337047353765
+        },
+        "band_low": {
+          "tp": 22,
+          "fp": 966,
+          "fn": 0,
+          "tn": 0,
+          "precision": 0.022267206477732792,
+          "recall": 1.0,
+          "f1": 0.04356435643564356
+        }
+      },
+      "band": {
+        "method": "symmetric_residual_band",
+        "delta_pct": 6.8133648510954075,
+        "empirical_coverage": 0.7661943319838057
+      }
+    },
+    "h12": {
+      "n_test_rows": 985,
+      "n_dip_rows": 22,
+      "n_summer_dip_rows": 5,
+      "dip_events": {
+        "n": 22,
+        "model_mae": 22.31202576377175,
+        "clim_mae": 22.051239669421484,
+        "persist_mae": 25.272727272727273
+      },
+      "summer_dip_events": {
+        "n": 5,
+        "model_mae": 26.466432952880858,
+        "clim_mae": 24.65333333333333,
+        "persist_mae": 27.0
+      },
+      "detection": {
+        "point": {
+          "tp": 8,
+          "fp": 304,
+          "fn": 14,
+          "tn": 659,
+          "precision": 0.02564102564102564,
+          "recall": 0.36363636363636365,
+          "f1": 0.04790419161676646
+        },
+        "band_low": {
+          "tp": 22,
+          "fp": 963,
+          "fn": 0,
+          "tn": 0,
+          "precision": 0.02233502538071066,
+          "recall": 1.0,
+          "f1": 0.04369414101290963
+        }
+      },
+      "band": {
+        "method": "symmetric_residual_band",
+        "delta_pct": 6.683368329375867,
+        "empirical_coverage": 0.7756345177664975
+      }
+    },
+    "h13": {
+      "n_test_rows": 982,
+      "n_dip_rows": 22,
+      "n_summer_dip_rows": 5,
+      "dip_events": {
+        "n": 22,
+        "model_mae": 16.02657110040838,
+        "clim_mae": 22.07926997245179,
+        "persist_mae": 28.681818181818183
+      },
+      "summer_dip_events": {
+        "n": 5,
+        "model_mae": 16.749165344238282,
+        "clim_mae": 24.533333333333335,
+        "persist_mae": 27.0
+      },
+      "detection": {
+        "point": {
+          "tp": 22,
+          "fp": 960,
+          "fn": 0,
+          "tn": 0,
+          "precision": 0.02240325865580448,
+          "recall": 1.0,
+          "f1": 0.04382470119521912
+        },
+        "band_low": {
+          "tp": 22,
+          "fp": 960,
+          "fn": 0,
+          "tn": 0,
+          "precision": 0.02240325865580448,
+          "recall": 1.0,
+          "f1": 0.04382470119521912
+        }
+      },
+      "band": {
+        "method": "symmetric_residual_band",
+        "delta_pct": 8.34258453074285,
+        "empirical_coverage": 0.8156822810590632
+      }
+    },
+    "h14": {
+      "n_test_rows": 979,
+      "n_dip_rows": 21,
+      "n_summer_dip_rows": 5,
+      "dip_events": {
+        "n": 21,
+        "model_mae": 19.116663251604354,
+        "clim_mae": 22.564574314574312,
+        "persist_mae": 30.095238095238095
+      },
+      "summer_dip_events": {
+        "n": 5,
+        "model_mae": 13.214102172851563,
+        "clim_mae": 24.279999999999998,
+        "persist_mae": 27.0
+      },
+      "detection": {
+        "point": {
+          "tp": 12,
+          "fp": 402,
+          "fn": 9,
+          "tn": 556,
+          "precision": 0.028985507246376812,
+          "recall": 0.5714285714285714,
+          "f1": 0.05517241379310344
+        },
+        "band_low": {
+          "tp": 21,
+          "fp": 958,
+          "fn": 0,
+          "tn": 0,
+          "precision": 0.021450459652706845,
+          "recall": 1.0,
+          "f1": 0.04200000000000001
+        }
+      },
+      "band": {
+        "method": "symmetric_residual_band",
+        "delta_pct": 6.82453852050309,
+        "empirical_coverage": 0.8273748723186926
+      }
+    }
+  },
+  "historical_highlights": [
+    {
+      "run_date": "2012-07-15",
+      "source": "era5_fallback",
+      "is_pre_nwp": true,
+      "rows": [
+        {
+          "horizon_days": 1,
+          "target_date": "2012-07-16",
+          "actual_pct": 100.0,
+          "point_pct": 93.1603012084961,
+          "band_low_pct": 85.51403992952567,
+          "band_high_pct": 100.0,
+          "alert_level": "watch"
+        },
+        {
+          "horizon_days": 2,
+          "target_date": "2012-07-17",
+          "actual_pct": 100.0,
+          "point_pct": 99.28472137451172,
+          "band_low_pct": 93.71234231514867,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 3,
+          "target_date": "2012-07-18",
+          "actual_pct": 100.0,
+          "point_pct": 99.50226593017578,
+          "band_low_pct": 99.00453186035156,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 4,
+          "target_date": "2012-07-19",
+          "actual_pct": 100.0,
+          "point_pct": 99.26659393310547,
+          "band_low_pct": 97.80076628352492,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 5,
+          "target_date": "2012-07-20",
+          "actual_pct": 100.0,
+          "point_pct": 94.8906021118164,
+          "band_low_pct": 89.14416054774108,
+          "band_high_pct": 100.0,
+          "alert_level": "watch"
+        },
+        {
+          "horizon_days": 6,
+          "target_date": "2012-07-21",
+          "actual_pct": 100.0,
+          "point_pct": 94.2342758178711,
+          "band_low_pct": 89.0974359274368,
+          "band_high_pct": 99.37111570830538,
+          "alert_level": "watch"
+        },
+        {
+          "horizon_days": 7,
+          "target_date": "2012-07-22",
+          "actual_pct": 100.0,
+          "point_pct": 94.1463623046875,
+          "band_low_pct": 88.15617909280299,
+          "band_high_pct": 100.0,
+          "alert_level": "watch"
+        },
+        {
+          "horizon_days": 8,
+          "target_date": "2012-07-23",
+          "actual_pct": 100.0,
+          "point_pct": 99.07955932617188,
+          "band_low_pct": 93.15590006754948,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 9,
+          "target_date": "2012-07-24",
+          "actual_pct": 100.0,
+          "point_pct": 89.63800811767578,
+          "band_low_pct": 83.09393931766103,
+          "band_high_pct": 96.18207691769054,
+          "alert_level": "alert"
+        },
+        {
+          "horizon_days": 10,
+          "target_date": "2012-07-25",
+          "actual_pct": 100.0,
+          "point_pct": 99.11259460449219,
+          "band_low_pct": 92.32734070118222,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 11,
+          "target_date": "2012-07-26",
+          "actual_pct": 100.0,
+          "point_pct": 99.61016845703125,
+          "band_low_pct": 92.79680360593585,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 12,
+          "target_date": "2012-07-27",
+          "actual_pct": 100.0,
+          "point_pct": 99.21582794189453,
+          "band_low_pct": 92.53245961251866,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 13,
+          "target_date": "2012-07-28",
+          "actual_pct": 100.0,
+          "point_pct": 89.92684173583984,
+          "band_low_pct": 81.58425720509699,
+          "band_high_pct": 98.2694262665827,
+          "alert_level": "alert"
+        },
+        {
+          "horizon_days": 14,
+          "target_date": "2012-07-29",
+          "actual_pct": 100.0,
+          "point_pct": 90.82829284667969,
+          "band_low_pct": 84.00375432617659,
+          "band_high_pct": 97.65283136718278,
+          "alert_level": "watch"
+        }
+      ]
+    },
+    {
+      "run_date": "2018-07-01",
+      "source": "historical_nwp",
+      "is_pre_nwp": false,
+      "rows": [
+        {
+          "horizon_days": 1,
+          "target_date": "2018-07-02",
+          "actual_pct": 100.0,
+          "point_pct": 100.0,
+          "band_low_pct": 92.35373872102957,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 2,
+          "target_date": "2018-07-03",
+          "actual_pct": 100.0,
+          "point_pct": 99.51041412353516,
+          "band_low_pct": 93.93803506417211,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 3,
+          "target_date": "2018-07-04",
+          "actual_pct": 100.0,
+          "point_pct": 99.50226593017578,
+          "band_low_pct": 99.00453186035156,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 4,
+          "target_date": "2018-07-05",
+          "actual_pct": 100.0,
+          "point_pct": 99.26659393310547,
+          "band_low_pct": 97.80076628352492,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 5,
+          "target_date": "2018-07-06",
+          "actual_pct": 94.0,
+          "point_pct": 99.65753173828125,
+          "band_low_pct": 93.91109017420592,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 6,
+          "target_date": "2018-07-07",
+          "actual_pct": 100.0,
+          "point_pct": 100.0,
+          "band_low_pct": 94.86316010956571,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 7,
+          "target_date": "2018-07-08",
+          "actual_pct": 100.0,
+          "point_pct": 100.0,
+          "band_low_pct": 94.00981678811549,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 8,
+          "target_date": "2018-07-09",
+          "actual_pct": 100.0,
+          "point_pct": 100.0,
+          "band_low_pct": 94.0763407413776,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 9,
+          "target_date": "2018-07-10",
+          "actual_pct": 100.0,
+          "point_pct": 100.0,
+          "band_low_pct": 93.45593119998524,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 10,
+          "target_date": "2018-07-11",
+          "actual_pct": 100.0,
+          "point_pct": 100.0,
+          "band_low_pct": 93.21474609669004,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 11,
+          "target_date": "2018-07-12",
+          "actual_pct": 100.0,
+          "point_pct": 99.61016845703125,
+          "band_low_pct": 92.79680360593585,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 12,
+          "target_date": "2018-07-13",
+          "actual_pct": 100.0,
+          "point_pct": 100.0,
+          "band_low_pct": 93.31663167062413,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 13,
+          "target_date": "2018-07-14",
+          "actual_pct": 100.0,
+          "point_pct": 92.68145751953125,
+          "band_low_pct": 84.3388729887884,
+          "band_high_pct": 100.0,
+          "alert_level": "watch"
+        },
+        {
+          "horizon_days": 14,
+          "target_date": "2018-07-15",
+          "actual_pct": 100.0,
+          "point_pct": 99.69999694824219,
+          "band_low_pct": 92.87545842773909,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        }
+      ]
+    },
+    {
+      "run_date": "2021-08-01",
+      "source": "historical_nwp",
+      "is_pre_nwp": false,
+      "rows": [
+        {
+          "horizon_days": 1,
+          "target_date": "2021-08-02",
+          "actual_pct": 100.0,
+          "point_pct": 99.31566619873047,
+          "band_low_pct": 91.66940491976004,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 2,
+          "target_date": "2021-08-03",
+          "actual_pct": 100.0,
+          "point_pct": 99.71428680419922,
+          "band_low_pct": 94.14190774483617,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 3,
+          "target_date": "2021-08-04",
+          "actual_pct": 100.0,
+          "point_pct": 99.50226593017578,
+          "band_low_pct": 99.00453186035156,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 4,
+          "target_date": "2021-08-05",
+          "actual_pct": 100.0,
+          "point_pct": 99.26659393310547,
+          "band_low_pct": 97.80076628352492,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 5,
+          "target_date": "2021-08-06",
+          "actual_pct": 100.0,
+          "point_pct": 99.2727279663086,
+          "band_low_pct": 93.52628640223327,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 6,
+          "target_date": "2021-08-07",
+          "actual_pct": 100.0,
+          "point_pct": 99.0406723022461,
+          "band_low_pct": 93.9038324118118,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 7,
+          "target_date": "2021-08-08",
+          "actual_pct": 100.0,
+          "point_pct": 99.21703338623047,
+          "band_low_pct": 93.22685017434596,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 8,
+          "target_date": "2021-08-09",
+          "actual_pct": 100.0,
+          "point_pct": 94.29541778564453,
+          "band_low_pct": 88.37175852702214,
+          "band_high_pct": 100.0,
+          "alert_level": "watch"
+        },
+        {
+          "horizon_days": 9,
+          "target_date": "2021-08-10",
+          "actual_pct": 100.0,
+          "point_pct": 94.72106170654297,
+          "band_low_pct": 88.17699290652821,
+          "band_high_pct": 100.0,
+          "alert_level": "watch"
+        },
+        {
+          "horizon_days": 10,
+          "target_date": "2021-08-11",
+          "actual_pct": 100.0,
+          "point_pct": 99.11259460449219,
+          "band_low_pct": 92.32734070118222,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 11,
+          "target_date": "2021-08-12",
+          "actual_pct": 100.0,
+          "point_pct": 98.83848571777344,
+          "band_low_pct": 92.02512086667804,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 12,
+          "target_date": "2021-08-13",
+          "actual_pct": 100.0,
+          "point_pct": 99.35713958740234,
+          "band_low_pct": 92.67377125802648,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 13,
+          "target_date": "2021-08-14",
+          "actual_pct": 100.0,
+          "point_pct": 92.1229019165039,
+          "band_low_pct": 83.78031738576105,
+          "band_high_pct": 100.0,
+          "alert_level": "watch"
+        },
+        {
+          "horizon_days": 14,
+          "target_date": "2021-08-15",
+          "actual_pct": 100.0,
+          "point_pct": 100.0,
+          "band_low_pct": 93.1754614794969,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        }
+      ]
+    },
+    {
+      "run_date": "2022-07-15",
+      "source": "historical_nwp",
+      "is_pre_nwp": false,
+      "rows": [
+        {
+          "horizon_days": 1,
+          "target_date": "2022-07-16",
+          "actual_pct": 100.0,
+          "point_pct": 92.28398132324219,
+          "band_low_pct": 84.63772004427176,
+          "band_high_pct": 99.93024260221262,
+          "alert_level": "watch"
+        },
+        {
+          "horizon_days": 2,
+          "target_date": "2022-07-17",
+          "actual_pct": 100.0,
+          "point_pct": 99.26213836669922,
+          "band_low_pct": 93.68975930733617,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 3,
+          "target_date": "2022-07-18",
+          "actual_pct": 100.0,
+          "point_pct": 99.50226593017578,
+          "band_low_pct": 99.00453186035156,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 4,
+          "target_date": "2022-07-19",
+          "actual_pct": 100.0,
+          "point_pct": 99.26659393310547,
+          "band_low_pct": 97.80076628352492,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 5,
+          "target_date": "2022-07-20",
+          "actual_pct": 100.0,
+          "point_pct": 99.2727279663086,
+          "band_low_pct": 93.52628640223327,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 6,
+          "target_date": "2022-07-21",
+          "actual_pct": 100.0,
+          "point_pct": 99.8351058959961,
+          "band_low_pct": 94.6982660055618,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 7,
+          "target_date": "2022-07-22",
+          "actual_pct": 100.0,
+          "point_pct": 99.21703338623047,
+          "band_low_pct": 93.22685017434596,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 8,
+          "target_date": "2022-07-23",
+          "actual_pct": 100.0,
+          "point_pct": 99.07955932617188,
+          "band_low_pct": 93.15590006754948,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 9,
+          "target_date": "2022-07-24",
+          "actual_pct": 100.0,
+          "point_pct": 92.614013671875,
+          "band_low_pct": 86.06994487186024,
+          "band_high_pct": 99.15808247188976,
+          "alert_level": "watch"
+        },
+        {
+          "horizon_days": 10,
+          "target_date": "2022-07-25",
+          "actual_pct": 100.0,
+          "point_pct": 93.65314483642578,
+          "band_low_pct": 86.86789093311582,
+          "band_high_pct": 100.0,
+          "alert_level": "watch"
+        },
+        {
+          "horizon_days": 11,
+          "target_date": "2022-07-26",
+          "actual_pct": 100.0,
+          "point_pct": 87.85017395019531,
+          "band_low_pct": 81.03680909909991,
+          "band_high_pct": 94.66353880129071,
+          "alert_level": "alert"
+        },
+        {
+          "horizon_days": 12,
+          "target_date": "2022-07-27",
+          "actual_pct": 100.0,
+          "point_pct": 99.35713958740234,
+          "band_low_pct": 92.67377125802648,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 13,
+          "target_date": "2022-07-28",
+          "actual_pct": 100.0,
+          "point_pct": 92.71617889404297,
+          "band_low_pct": 84.37359436330011,
+          "band_high_pct": 100.0,
+          "alert_level": "watch"
+        },
+        {
+          "horizon_days": 14,
+          "target_date": "2022-07-29",
+          "actual_pct": 100.0,
+          "point_pct": 99.69999694824219,
+          "band_low_pct": 92.87545842773909,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        }
+      ]
+    },
+    {
+      "run_date": "2023-08-15",
+      "source": "historical_nwp",
+      "is_pre_nwp": false,
+      "rows": [
+        {
+          "horizon_days": 1,
+          "target_date": "2023-08-16",
+          "actual_pct": 100.0,
+          "point_pct": 99.31566619873047,
+          "band_low_pct": 91.66940491976004,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 2,
+          "target_date": "2023-08-17",
+          "actual_pct": 100.0,
+          "point_pct": 100.0,
+          "band_low_pct": 94.42762094063696,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 3,
+          "target_date": "2023-08-18",
+          "actual_pct": 100.0,
+          "point_pct": 100.0,
+          "band_low_pct": 99.50226593017578,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 4,
+          "target_date": "2023-08-19",
+          "actual_pct": 100.0,
+          "point_pct": 99.26659393310547,
+          "band_low_pct": 97.80076628352492,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 5,
+          "target_date": "2023-08-20",
+          "actual_pct": 100.0,
+          "point_pct": 99.2727279663086,
+          "band_low_pct": 93.52628640223327,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 6,
+          "target_date": "2023-08-21",
+          "actual_pct": 100.0,
+          "point_pct": 99.3977279663086,
+          "band_low_pct": 94.2608880758743,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 7,
+          "target_date": "2023-08-22",
+          "actual_pct": 100.0,
+          "point_pct": 99.21703338623047,
+          "band_low_pct": 93.22685017434596,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 8,
+          "target_date": "2023-08-23",
+          "actual_pct": 100.0,
+          "point_pct": 91.6759033203125,
+          "band_low_pct": 85.7522440616901,
+          "band_high_pct": 97.5995625789349,
+          "alert_level": "watch"
+        },
+        {
+          "horizon_days": 9,
+          "target_date": "2023-08-24",
+          "actual_pct": 100.0,
+          "point_pct": 92.5953369140625,
+          "band_low_pct": 86.05126811404774,
+          "band_high_pct": 99.13940571407726,
+          "alert_level": "watch"
+        },
+        {
+          "horizon_days": 10,
+          "target_date": "2023-08-25",
+          "actual_pct": 100.0,
+          "point_pct": 99.08772277832031,
+          "band_low_pct": 92.30246887501035,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 11,
+          "target_date": "2023-08-26",
+          "actual_pct": 100.0,
+          "point_pct": 98.83848571777344,
+          "band_low_pct": 92.02512086667804,
+          "band_high_pct": 100.0,
+          "alert_level": "operational"
+        },
+        {
+          "horizon_days": 12,
+          "target_date": "2023-08-27",
+          "actual_pct": 100.0,
+          "point_pct": 89.63381958007812,
+          "band_low_pct": 82.95045125070226,
+          "band_high_pct": 96.31718790945399,
+          "alert_level": "alert"
+        },
+        {
+          "horizon_days": 13,
+          "target_date": "2023-08-28",
+          "actual_pct": 100.0,
+          "point_pct": 84.02366638183594,
+          "band_low_pct": 75.68108185109308,
+          "band_high_pct": 92.36625091257879,
+          "alert_level": "alert"
+        },
+        {
+          "horizon_days": 14,
+          "target_date": "2023-08-29",
+          "actual_pct": 100.0,
+          "point_pct": 92.40917205810547,
+          "band_low_pct": 85.58463353760237,
+          "band_high_pct": 99.23371057860857,
+          "alert_level": "watch"
+        }
+      ]
+    }
+  ]
+}

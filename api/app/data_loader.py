@@ -1,99 +1,172 @@
-"""Read precomputed forecast/backtest artifacts from data/artifacts.
+"""All forecast/backtest/feature data is pulled from Postgres.
 
-The api/ container does not invoke the ML pipeline at request time. The
-demo flow is: `just forecast` (refreshes data/artifacts/forecast_latest.json
-and attributions_latest.json) and `just backtest` (refreshes
-data/artifacts/backtest_results.parquet) on the operator's machine, then
-the api serves the cached artifacts. This keeps the api container free of
-Open-Meteo secrets, XGBoost, and pandas-driven feature pipelines at
-request time, with one exception: the recent-actuals, inputs, and
-backtest readers do a lightweight pandas read against interim parquet
-when called.
+The api container ships no data files. The ml refresher service runs on
+a daily cron, regenerates everything (forecast, attributions, backtest
+results, interim parquets, EIA snapshot), and pushes the bytes into the
+``forecast_artifacts`` table. Every loader here fetches from PG via
+``app.db.fetch_artifact`` (which has its own 5-min TTL cache).
+
+``SUPPORTED_PLANTS`` is the route-layer allowlist — add new slugs once
+the refresher is producing artifacts for them.
 """
 from __future__ import annotations
 
+import io
 import json
 from datetime import date
-from functools import lru_cache
-from pathlib import Path
 
-# Resolve repo root from this file's location:
-#   api/app/data_loader.py -> ../../../ = repo root
-REPO_ROOT = Path(__file__).resolve().parents[2]
-ARTIFACTS_DIR = REPO_ROOT / "data" / "artifacts"
-INTERIM_DIR = REPO_ROOT / "data" / "interim"
+import pandas as pd
 
-# v1 API serves a single plant. The slug picks which subdirectory under
-# data/artifacts/ and which slug-suffixed interim files this container
-# reads. The training pipeline already supports arbitrary slugs; multi-
-# plant API integration is a separate task.
-PLANT_SLUG = "quad_cities_1"
-_PLANT_ARTIFACTS_DIR = ARTIFACTS_DIR / PLANT_SLUG
+from app.db import GLOBAL_PLANT, fetch_artifact
+
+# Plants the api will serve. A slug is "supported" once `just train`,
+# `just backtest`, and a successful refresher run have produced its
+# artifact set in postgres. Adding a new slug here is the only api-side
+# change needed to expose another plant.
+SUPPORTED_PLANTS = frozenset({"quad_cities_1", "byron_1"})
 
 
-def forecast_path() -> Path:
-    return _PLANT_ARTIFACTS_DIR / "forecast_latest.json"
-
-
-def attributions_path() -> Path:
-    return _PLANT_ARTIFACTS_DIR / "attributions_latest.json"
-
-
-def backtest_results_path() -> Path:
-    return _PLANT_ARTIFACTS_DIR / "backtest_results.parquet"
-
-
-def backtest_metrics_path() -> Path:
-    return _PLANT_ARTIFACTS_DIR / "backtest_metrics.json"
-
-
-def eia_plants_path() -> Path:
-    return INTERIM_DIR / "eia_nuclear_plants.parquet"
-
-
-def labels_path() -> Path:
-    return INTERIM_DIR / f"labels_{PLANT_SLUG}.parquet"
-
-
-def weather_path() -> Path:
-    return INTERIM_DIR / f"weather_{PLANT_SLUG}.parquet"
-
-
-def water_path() -> Path:
-    return INTERIM_DIR / f"water_{PLANT_SLUG}.parquet"
-
-
-@lru_cache(maxsize=1)
-def load_forecast() -> dict:
-    p = forecast_path()
-    if not p.exists():
-        raise FileNotFoundError(
-            f"missing {p}; run `just forecast` to refresh"
+def _ensure_supported(slug: str) -> None:
+    """Raise ValueError for slugs not in SUPPORTED_PLANTS — route layer
+    converts this into a 404 with a helpful detail."""
+    if slug not in SUPPORTED_PLANTS:
+        raise ValueError(
+            f"plant_id={slug!r} not modeled; supported: {sorted(SUPPORTED_PLANTS)}"
         )
-    return json.loads(p.read_text())
 
 
-@lru_cache(maxsize=1)
-def load_attributions() -> dict:
-    p = attributions_path()
-    if not p.exists():
-        raise FileNotFoundError(
-            f"missing {p}; run `just forecast` to refresh"
+def _fetch_json(slug: str, artifact_type: str) -> dict:
+    return json.loads(fetch_artifact(slug, artifact_type).decode("utf-8"))
+
+
+def _fetch_parquet(slug: str, artifact_type: str) -> pd.DataFrame:
+    return pd.read_parquet(io.BytesIO(fetch_artifact(slug, artifact_type)))
+
+
+# ---------- forecast + attributions (refreshed daily) -------------------
+
+
+def load_forecast(slug: str) -> dict:
+    _ensure_supported(slug)
+    return _fetch_json(slug, "forecast")
+
+
+def load_attributions(slug: str) -> dict:
+    _ensure_supported(slug)
+    return _fetch_json(slug, "attributions")
+
+
+# ---------- backtest (rebuilt daily by the refresher) ------------------
+
+
+def load_backtest_metrics(slug: str) -> dict:
+    _ensure_supported(slug)
+    return _fetch_json(slug, "backtest_metrics")
+
+
+def load_backtest_for_run_date(slug: str, run_date: date) -> list[dict]:
+    """Return all (horizon, prediction, actual) rows for a given run date."""
+    _ensure_supported(slug)
+    df = _fetch_parquet(slug, "backtest_results")
+    df["feature_date"] = pd.to_datetime(df["feature_date"]).dt.date
+    df["target_date"] = pd.to_datetime(df["target_date"]).dt.date
+    sub = df[df["feature_date"] == run_date]
+    return sub.sort_values("horizon").to_dict(orient="records")
+
+
+def load_backtest_series(slug: str, horizon: int, days: int) -> list[dict]:
+    """Trailing window of (target_date, actual, point) rows for one horizon.
+
+    Used by the History overlay to show what the model would have
+    predicted on each historical day. Indexed by target_date (when the
+    forecast was *for*) rather than feature_date (when the run was made),
+    since the History chart's x-axis is target dates.
+    """
+    _ensure_supported(slug)
+    df = _fetch_parquet(slug, "backtest_results")[
+        ["horizon", "target_date", "actual", "point"]
+    ]
+    sub = df[df["horizon"] == horizon].copy()
+    sub["target_date"] = pd.to_datetime(sub["target_date"]).dt.date
+    sub = sub.sort_values("target_date").tail(days)
+    return [
+        {
+            "date": r["target_date"],
+            "actual_pct": (
+                float(r["actual"]) if r.get("actual") is not None and pd.notna(r.get("actual")) else None
+            ),
+            "point_pct": float(r["point"]),
+        }
+        for r in sub.to_dict(orient="records")
+    ]
+
+
+def load_backtest_dates(slug: str) -> list[date]:
+    """Sorted unique run_dates available in the backtest parquet.
+
+    Powers the replay slider's valid range. The parquet is rewritten by
+    the refresher; the db.py TTL cache keeps repeat reads cheap.
+    """
+    _ensure_supported(slug)
+    df = _fetch_parquet(slug, "backtest_results")[["feature_date"]]
+    dates = pd.to_datetime(df["feature_date"]).dt.date.unique().tolist()
+    return sorted(dates)
+
+
+# ---------- recent observed data (refreshed daily) ----------------------
+
+
+def load_recent_actuals(slug: str, days: int) -> list[dict]:
+    """Return the most recent N days of realized capacity factor.
+
+    Outage and pre-outage rows are returned with `power_pct=None` so the
+    chart can render a gap rather than a misleading 0%.
+    """
+    _ensure_supported(slug)
+    df = _fetch_parquet(slug, "labels")
+    df["date"] = pd.to_datetime(df["date"]).dt.date
+    df = df.sort_values("date").tail(days)
+    rows: list[dict] = []
+    for r in df.to_dict(orient="records"):
+        is_outage = bool(r.get("is_outage")) or bool(r.get("is_pre_outage"))
+        power = r.get("power_pct")
+        rows.append(
+            {
+                "date": r["date"],
+                "power_pct": float(power) if power is not None and not is_outage else None,
+                "is_outage": is_outage,
+            }
         )
-    return json.loads(p.read_text())
+    return rows
 
 
-@lru_cache(maxsize=1)
-def load_backtest_metrics() -> dict:
-    p = backtest_metrics_path()
-    if not p.exists():
-        raise FileNotFoundError(
-            f"missing {p}; run `just backtest` to refresh"
-        )
-    return json.loads(p.read_text())
+def load_recent_inputs(slug: str, days: int) -> list[dict]:
+    """Join the trailing N days of weather + water inputs for sparklines."""
+    _ensure_supported(slug)
+    weather = _fetch_parquet(slug, "weather")[["date", "air_temp_c_max"]]
+    water = _fetch_parquet(slug, "water")[["date", "water_temp_c", "streamflow_cfs"]]
+    df = weather.merge(water, on="date", how="outer").sort_values("date").tail(days)
+    df["date"] = pd.to_datetime(df["date"]).dt.date
+
+    def _f(v: object) -> float | None:
+        if v is None or pd.isna(v):
+            return None
+        return float(v)
+
+    return [
+        {
+            "date": r["date"],
+            "air_temp_c_max": _f(r.get("air_temp_c_max")),
+            "water_temp_c": _f(r.get("water_temp_c")),
+            "streamflow_cfs": _f(r.get("streamflow_cfs")),
+        }
+        for r in df.to_dict(orient="records")
+    ]
 
 
-@lru_cache(maxsize=1)
+# ---------- global EIA-860 snapshot (refreshed daily, single row) -------
+
+
 def load_eia_plants() -> list[dict]:
     """Return all nuclear plants from EIA-860 as plain dicts.
 
@@ -102,14 +175,7 @@ def load_eia_plants() -> list[dict]:
     overlaying any hand-curated entries (e.g. QC1 with operator/river
     detail EIA does not surface).
     """
-    p = eia_plants_path()
-    if not p.exists():
-        raise FileNotFoundError(
-            f"missing {p}; run `just features` to refresh"
-        )
-    import pandas as pd
-
-    df = pd.read_parquet(p)
+    df = _fetch_parquet(GLOBAL_PLANT, "eia_plants")
     df = df.sort_values("plant_name")
     rows: list[dict] = []
     for r in df.to_dict(orient="records"):
@@ -135,99 +201,3 @@ def load_eia_plants() -> list[dict]:
             }
         )
     return rows
-
-
-def load_recent_actuals(days: int) -> list[dict]:
-    """Return the most recent N days of realized capacity factor.
-
-    Outage and pre-outage rows are returned with `power_pct=None` so the
-    chart can render a gap rather than a misleading 0%.
-    """
-    import pandas as pd
-
-    p = labels_path()
-    if not p.exists():
-        raise FileNotFoundError(
-            f"missing {p}; run `just ingest-labels` to refresh"
-        )
-    df = pd.read_parquet(p)
-    df["date"] = pd.to_datetime(df["date"]).dt.date
-    df = df.sort_values("date").tail(days)
-    rows: list[dict] = []
-    for r in df.to_dict(orient="records"):
-        is_outage = bool(r.get("is_outage")) or bool(r.get("is_pre_outage"))
-        power = r.get("power_pct")
-        rows.append(
-            {
-                "date": r["date"],
-                "power_pct": float(power) if power is not None and not is_outage else None,
-                "is_outage": is_outage,
-            }
-        )
-    return rows
-
-
-def load_recent_inputs(days: int) -> list[dict]:
-    """Join the trailing N days of weather + water inputs for sparklines."""
-    import pandas as pd
-
-    wp = weather_path()
-    rp = water_path()
-    if not wp.exists() or not rp.exists():
-        raise FileNotFoundError(
-            "missing weather or water parquet; run `just features` to refresh"
-        )
-    weather = pd.read_parquet(wp)[["date", "air_temp_c_max"]]
-    water = pd.read_parquet(rp)[["date", "water_temp_c", "streamflow_cfs"]]
-    df = weather.merge(water, on="date", how="outer").sort_values("date").tail(days)
-    df["date"] = pd.to_datetime(df["date"]).dt.date
-
-    def _f(v: object) -> float | None:
-        if v is None or pd.isna(v):
-            return None
-        return float(v)
-
-    return [
-        {
-            "date": r["date"],
-            "air_temp_c_max": _f(r.get("air_temp_c_max")),
-            "water_temp_c": _f(r.get("water_temp_c")),
-            "streamflow_cfs": _f(r.get("streamflow_cfs")),
-        }
-        for r in df.to_dict(orient="records")
-    ]
-
-
-def load_backtest_for_run_date(run_date: date) -> list[dict]:
-    """Return all (horizon, prediction, actual) rows for a given run date."""
-    import pandas as pd
-
-    p = backtest_results_path()
-    if not p.exists():
-        raise FileNotFoundError(
-            f"missing {p}; run `just backtest` to refresh"
-        )
-    df = pd.read_parquet(p)
-    df["feature_date"] = pd.to_datetime(df["feature_date"]).dt.date
-    df["target_date"] = pd.to_datetime(df["target_date"]).dt.date
-    sub = df[df["feature_date"] == run_date]
-    return sub.sort_values("horizon").to_dict(orient="records")
-
-
-@lru_cache(maxsize=1)
-def load_backtest_dates() -> list[date]:
-    """Sorted unique run_dates available in the backtest parquet.
-
-    Powers the replay slider's valid range. Cached because the parquet
-    is rewritten only by `just backtest`, not at request time.
-    """
-    import pandas as pd
-
-    p = backtest_results_path()
-    if not p.exists():
-        raise FileNotFoundError(
-            f"missing {p}; run `just backtest` to refresh"
-        )
-    df = pd.read_parquet(p, columns=["feature_date"])
-    dates = pd.to_datetime(df["feature_date"]).dt.date.unique().tolist()
-    return sorted(dates)

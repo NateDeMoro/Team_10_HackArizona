@@ -1,8 +1,8 @@
 """GET /plants — full nuclear-plant catalog for the UI map.
 
-v1 returns Quad Cities Unit 1 as the only fully-modeled site (`modeled=True`)
-plus every other operating US nuclear plant from EIA-860 as a placeholder
-(`modeled=False`) so the map can render the "scaling is the next step"
+Returns every fully-modeled site (``modeled=True``) plus every other
+operating US nuclear plant from EIA-860 as a placeholder
+(``modeled=False``) so the map can render the "scaling is the next step"
 story per Tier 5 of Project_Plan.md.
 """
 from __future__ import annotations
@@ -14,10 +14,11 @@ from app.schemas import Plant
 
 router = APIRouter(prefix="/plants", tags=["plants"])
 
-# EIA plant_codes that the v1 model serves directly. Used to suppress the
-# placeholder EIA entry so each plant appears exactly once on the map.
-# Quad Cities Generating Station = EIA plant_code 880.
+# EIA plant_codes for fully-modeled plants. Used to suppress the placeholder
+# EIA entry so each plant appears exactly once on the map.
+# Quad Cities Generating Station = 880; Byron Generating Station = 6023.
 QC1_PLANT_CODE = 880
+BYRON_PLANT_CODE = 6023
 
 # Hand-curated entries for fully-modeled plants. Adding a plant here makes
 # it appear on the UI map as a live (interactive) marker. Operator/river
@@ -32,6 +33,18 @@ MODELED_PLANTS: dict[str, dict] = {
         "lon": -90.3097,
         "state": "IL",
         "plant_code": QC1_PLANT_CODE,
+        "nameplate_mw": None,
+        "modeled": True,
+    },
+    "byron_1": {
+        "id": "byron_1",
+        "display_name": "Byron Unit 1",
+        "operator": "Constellation",
+        "river": "Rock",
+        "lat": 42.0747,
+        "lon": -89.2811,
+        "state": "IL",
+        "plant_code": BYRON_PLANT_CODE,
         "nameplate_mw": None,
         "modeled": True,
     },

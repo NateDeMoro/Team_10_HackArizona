@@ -3,14 +3,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from app.data_loader import load_forecast
+from app.data_loader import SUPPORTED_PLANTS, load_forecast
 from app.schemas import ForecastResponse
 
 router = APIRouter(prefix="/plants", tags=["forecast"])
-
-# v1 supports a single plant; the response is precomputed by `just forecast`
-# on the operator's machine.
-SUPPORTED_PLANTS = frozenset({"quad_cities_1"})
 
 
 @router.get("/{plant_id}/forecast", response_model=ForecastResponse)
@@ -21,7 +17,7 @@ def get_forecast(plant_id: str) -> ForecastResponse:
             detail=f"plant_id={plant_id!r} not modeled in v1",
         )
     try:
-        payload = load_forecast()
+        payload = load_forecast(plant_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     if payload.get("plant_id") != plant_id:
@@ -29,7 +25,7 @@ def get_forecast(plant_id: str) -> ForecastResponse:
             status_code=503,
             detail=(
                 f"cached forecast is for {payload.get('plant_id')!r}, "
-                f"not {plant_id!r}; run `just forecast`"
+                f"not {plant_id!r}; run `just forecast {plant_id}`"
             ),
         )
     return ForecastResponse.model_validate(payload)

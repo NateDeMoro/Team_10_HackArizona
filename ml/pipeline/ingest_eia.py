@@ -33,7 +33,7 @@ from schemas import (  # noqa: E402
 
 log = logging.getLogger(__name__)
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]  # ml/ (data lives at ml/data/)
 RAW_DIR = REPO_ROOT / "data" / "raw" / "eia"
 INTERIM_DIR = REPO_ROOT / "data" / "interim"
 

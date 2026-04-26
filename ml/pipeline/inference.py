@@ -28,6 +28,7 @@ Reads:
     data/artifacts/feature_columns.json
     data/artifacts/band_deltas.json
     data/artifacts/model_h{H}_point.json
+    data/artifacts/calibrator_h{H}.json
 Writes (when invoked from CLI):
     data/artifacts/forecast_latest.json       (precomputed response for the API)
     data/artifacts/attributions_latest.json   (per-horizon SHAP top features)
@@ -46,7 +47,7 @@ import pandas as pd
 import xgboost as xgb
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from plants import get_plant  # noqa: E402
+from plants import PLANTS, get_plant  # noqa: E402
 from schemas import (  # noqa: E402
     CATEGORICAL_FEATURES,
     DIP_THRESHOLD_PCT,
@@ -69,24 +70,28 @@ ATTRIBUTION_TOP_N = 10
 
 log = logging.getLogger(__name__)
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]  # ml/ (data lives at ml/data/)
 PROCESSED_DIR = REPO_ROOT / "data" / "processed"
 ARTIFACTS_DIR = REPO_ROOT / "data" / "artifacts"
 
-# v1 inference is single-plant: the live JSON the API serves comes from
-# this slug. Multi-plant API integration is a separate task; the training
-# pipeline already supports any registered plant slug.
+# Backwards-compat alias: legacy callers (older notebooks, scripts) may
+# import PLANT_QC1. Prefer passing a plant slug to the helpers below.
 PLANT_QC1 = "quad_cities_1"
-_PLANT = get_plant(PLANT_QC1)
-_PLANT_PROCESSED_DIR = PROCESSED_DIR / _PLANT.slug
-_PLANT_ARTIFACTS_DIR = ARTIFACTS_DIR / _PLANT.slug
 
 
-def _load_features() -> pd.DataFrame:
-    src = _PLANT_PROCESSED_DIR / "training_dataset.parquet"
+def _processed_dir(slug: str) -> Path:
+    return PROCESSED_DIR / slug
+
+
+def _artifacts_dir(slug: str) -> Path:
+    return ARTIFACTS_DIR / slug
+
+
+def _load_features(slug: str) -> pd.DataFrame:
+    src = _processed_dir(slug) / "training_dataset.parquet"
     if not src.exists():
         raise FileNotFoundError(
-            f"missing {src}; run `just features {PLANT_QC1}` to refresh the cache"
+            f"missing {src}; run `just features {slug}` to refresh the cache"
         )
     df = pd.read_parquet(src)
     df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None).dt.normalize()
@@ -96,13 +101,13 @@ def _load_features() -> pd.DataFrame:
     return df
 
 
-def _load_feature_columns() -> list[str]:
-    p = _PLANT_ARTIFACTS_DIR / "feature_columns.json"
+def _load_feature_columns(slug: str) -> list[str]:
+    p = _artifacts_dir(slug) / "feature_columns.json"
     return json.loads(p.read_text())
 
 
-def _load_band_deltas() -> dict[str, dict[str, float]]:
-    p = _PLANT_ARTIFACTS_DIR / "band_deltas.json"
+def _load_band_deltas(slug: str) -> dict[str, dict[str, float]]:
+    p = _artifacts_dir(slug) / "band_deltas.json"
     return json.loads(p.read_text())
 
 
@@ -110,6 +115,38 @@ def _load_booster(path: Path) -> xgb.XGBRegressor:
     m = xgb.XGBRegressor()
     m.load_model(str(path))
     return m
+
+
+def _load_calibrator(path: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Load isotonic-calibration breakpoints persisted by train.py.
+
+    Returns (x_thresholds, y_thresholds) — pass straight to np.interp,
+    which clips to the trained X range, exactly matching sklearn's
+    IsotonicRegression(out_of_bounds='clip').predict() behavior.
+    """
+    payload = json.loads(path.read_text())
+    return (
+        np.asarray(payload["x_thresholds"], dtype=float),
+        np.asarray(payload["y_thresholds"], dtype=float),
+    )
+
+
+def _apply_calibrator(
+    raw: np.ndarray | float, calibrator: tuple[np.ndarray, np.ndarray]
+) -> np.ndarray:
+    """Conditionally apply the isotonic mapping to raw model outputs.
+
+    Calibration is gated on `raw >= DIP_THRESHOLD_PCT`. The val set is
+    ~75% full-power rows, so a uniformly-applied isotonic learns "any
+    below-100 raw is really a 100%-mode error" and pulls dip predictions
+    up to the operational mode, killing dip recall. Restricting the
+    correction to the operational regime fixes the systemic bias on the
+    dominant mode while leaving rare dip predictions untouched.
+    """
+    x, y = calibrator
+    raw_arr = np.asarray(raw, dtype=float)
+    calibrated = np.interp(raw_arr, x, y)
+    return np.where(raw_arr >= DIP_THRESHOLD_PCT, calibrated, raw_arr)
 
 
 def _classify_alert_level(point_pct: float) -> AlertLevel:
@@ -145,17 +182,18 @@ def _classify_source(run_date: date) -> ForecastSource:
 
 
 def forecast(plant_id: str, run_date: date) -> ForecastResponse:
-    """Produce a 14-day forecast anchored at run_date.
+    """Produce a 14-day forecast anchored at run_date for any registered plant.
 
     Raises FileNotFoundError if the feature cache is missing the run_date
     row — caller should run `just features` first.
     """
-    if plant_id != PLANT_QC1:
-        raise ValueError(f"only {PLANT_QC1!r} is supported in v1; got {plant_id!r}")
+    if plant_id not in PLANTS:
+        raise ValueError(f"unknown plant_id={plant_id!r}; known: {sorted(PLANTS)}")
 
-    feat_cols = _load_feature_columns()
-    deltas = _load_band_deltas()
-    df = _load_features()
+    feat_cols = _load_feature_columns(plant_id)
+    deltas = _load_band_deltas(plant_id)
+    df = _load_features(plant_id)
+    artifacts_dir = _artifacts_dir(plant_id)
 
     run_ts = pd.Timestamp(run_date)
     row_mask = df["date"] == run_ts
@@ -163,23 +201,31 @@ def forecast(plant_id: str, run_date: date) -> ForecastResponse:
         avail_max = df["date"].max().date()
         raise LookupError(
             f"no feature row for run_date={run_date}; cache covers up to "
-            f"{avail_max}. Run `just features` to refresh."
+            f"{avail_max}. Run `just features {plant_id}` to refresh."
         )
 
     X_run = df.loc[row_mask, feat_cols].iloc[[0]].copy()
 
     horizons: list[HorizonPrediction] = []
     for h in HORIZONS:
-        point_path = _PLANT_ARTIFACTS_DIR / f"model_h{h:02d}_point.json"
+        point_path = artifacts_dir / f"model_h{h:02d}_point.json"
         if not point_path.exists():
             raise FileNotFoundError(
-                f"missing model artifact for h={h}; run `just train {PLANT_QC1}` first"
+                f"missing model artifact for h={h}; run `just train {plant_id}` first"
+            )
+        cal_path = artifacts_dir / f"calibrator_h{h:02d}.json"
+        if not cal_path.exists():
+            raise FileNotFoundError(
+                f"missing calibrator for h={h}; run `just train {plant_id}` first"
             )
         point_model = _load_booster(point_path)
-        point_pred = float(point_model.predict(X_run)[0])
+        calibrator = _load_calibrator(cal_path)
+        raw_pred = float(point_model.predict(X_run)[0])
+        point_pred = float(_apply_calibrator(raw_pred, calibrator))
 
         # Symmetric uncertainty band: [point - delta_h, point + delta_h].
-        # delta_h is the per-horizon 80th-percentile of |val residuals|.
+        # delta_h is the per-horizon 80th-percentile of |val residuals| of
+        # the calibrated point — band stays consistent with the served point.
         h_key = f"h{h:02d}"
         delta_h = float(deltas[h_key]["delta_pct"])
 
@@ -218,14 +264,17 @@ def attributions(plant_id: str, run_date: date) -> AttributionsResponse:
 
     Returns the top-N features by absolute contribution per horizon, in
     capacity-factor percentage points. baseline + sum(all contributions)
-    equals the unclamped point prediction; the top-N subset is what the
-    UI renders, so the running sum may not exactly match point_pct.
+    equals the *raw* (pre-calibration) point prediction; the top-N subset
+    is what the UI renders, so the running sum may not exactly match the
+    served point. `point_pct` reported here is post-calibration so it
+    matches the value the forecast endpoint serves.
     """
-    if plant_id != PLANT_QC1:
-        raise ValueError(f"only {PLANT_QC1!r} is supported in v1; got {plant_id!r}")
+    if plant_id not in PLANTS:
+        raise ValueError(f"unknown plant_id={plant_id!r}; known: {sorted(PLANTS)}")
 
-    feat_cols = _load_feature_columns()
-    df = _load_features()
+    feat_cols = _load_feature_columns(plant_id)
+    df = _load_features(plant_id)
+    artifacts_dir = _artifacts_dir(plant_id)
 
     run_ts = pd.Timestamp(run_date)
     row_mask = df["date"] == run_ts
@@ -233,7 +282,7 @@ def attributions(plant_id: str, run_date: date) -> AttributionsResponse:
         avail_max = df["date"].max().date()
         raise LookupError(
             f"no feature row for run_date={run_date}; cache covers up to "
-            f"{avail_max}. Run `just features` to refresh."
+            f"{avail_max}. Run `just features {plant_id}` to refresh."
         )
 
     X_run = df.loc[row_mask, feat_cols].iloc[[0]].copy()
@@ -251,11 +300,17 @@ def attributions(plant_id: str, run_date: date) -> AttributionsResponse:
     horizons: list[HorizonAttribution] = []
     dmat = xgb.DMatrix(X_run, enable_categorical=True)
     for h in HORIZONS:
-        point_path = _PLANT_ARTIFACTS_DIR / f"model_h{h:02d}_point.json"
+        point_path = artifacts_dir / f"model_h{h:02d}_point.json"
         if not point_path.exists():
             raise FileNotFoundError(
-                f"missing model artifact for h={h}; run `just train {PLANT_QC1}` first"
+                f"missing model artifact for h={h}; run `just train {plant_id}` first"
             )
+        cal_path = artifacts_dir / f"calibrator_h{h:02d}.json"
+        if not cal_path.exists():
+            raise FileNotFoundError(
+                f"missing calibrator for h={h}; run `just train {plant_id}` first"
+            )
+        calibrator = _load_calibrator(cal_path)
         booster = _load_booster(point_path).get_booster()
         # contribs shape: (1, n_features + 1); last column is the bias.
         contribs = booster.predict(dmat, pred_contribs=True)[0]
@@ -274,15 +329,15 @@ def attributions(plant_id: str, run_date: date) -> AttributionsResponse:
                     contribution_pct=float(feat_contribs[idx]),
                 )
             )
-        # Reconstruct the unclamped point prediction so the UI can show
-        # baseline -> point delta and warn if the top-N covers a small
-        # share of the total movement.
-        point_unclamped = float(baseline + feat_contribs.sum())
+        # Reconstruct the raw model output, then push through the
+        # calibrator so the reported point matches the forecast endpoint.
+        point_raw = float(baseline + feat_contribs.sum())
+        point_calibrated = float(_apply_calibrator(point_raw, calibrator))
         horizons.append(
             HorizonAttribution(
                 horizon_days=h,
                 baseline_pct=baseline,
-                point_pct=point_unclamped,
+                point_pct=point_calibrated,
                 top_features=top,
             )
         )
@@ -312,33 +367,40 @@ def _latest_complete_run_date(df: pd.DataFrame) -> date:
     return populated.max().date()
 
 
-def run() -> None:
-    """CLI entrypoint: precompute today's forecast and persist as JSON.
+def run(plant_id: str) -> None:
+    """CLI entrypoint: precompute today's forecast for a plant and persist.
 
-    Tier 4 serving model: this writes data/artifacts/forecast_latest.json
-    which the FastAPI route reads and returns. `just forecast` regenerates
-    it manually before demo time so the api/ container needs no Open-Meteo
-    secrets at request time.
+    Tier 4 serving model: this writes
+    data/artifacts/<slug>/forecast_latest.json which the FastAPI route
+    reads and returns. `just forecast <slug>` regenerates it manually
+    before demo time so the api/ container needs no Open-Meteo secrets
+    at request time.
     """
+    if plant_id not in PLANTS:
+        raise ValueError(f"unknown plant_id={plant_id!r}; known: {sorted(PLANTS)}")
+    artifacts_dir = _artifacts_dir(plant_id)
+
     today = datetime.now(UTC).date()
-    df = _load_features()
+    df = _load_features(plant_id)
     run_date = _latest_complete_run_date(df)
     if run_date < today:
         log.warning(
-            "ERA5 archive lag: anchoring run_date at %s (today=%s). Run "
-            "`just features` to refresh — current-day air temp lands a "
-            "few days behind real time.",
+            "[%s] ERA5 archive lag: anchoring run_date at %s (today=%s). "
+            "Run `just features %s` to refresh — current-day air temp "
+            "lands a few days behind real time.",
+            plant_id,
             run_date,
             today,
+            plant_id,
         )
 
-    resp = forecast(PLANT_QC1, run_date)
-    out = _PLANT_ARTIFACTS_DIR / "forecast_latest.json"
+    resp = forecast(plant_id, run_date)
+    out = artifacts_dir / "forecast_latest.json"
     out.write_text(resp.model_dump_json(indent=2))
     log.info("wrote %s (run_date=%s, source=%s)", out, run_date, resp.source)
 
-    attr = attributions(PLANT_QC1, run_date)
-    attr_out = _PLANT_ARTIFACTS_DIR / "attributions_latest.json"
+    attr = attributions(plant_id, run_date)
+    attr_out = artifacts_dir / "attributions_latest.json"
     attr_out.write_text(attr.model_dump_json(indent=2))
     log.info("wrote %s (run_date=%s)", attr_out, run_date)
 
@@ -349,8 +411,14 @@ def _main() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.parse_args()
-    run()
+    parser.add_argument(
+        "--plant",
+        required=True,
+        choices=sorted(PLANTS),
+        help="Plant slug from ml/plants.py.",
+    )
+    args = parser.parse_args()
+    run(args.plant)
 
 
 if __name__ == "__main__":

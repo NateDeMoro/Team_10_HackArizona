@@ -13,12 +13,21 @@ from datetime import date
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.data_loader import load_backtest_dates, load_backtest_for_run_date
-from app.schemas import BacktestDatesResponse, BacktestResponse, BacktestRow
+from app.data_loader import (
+    SUPPORTED_PLANTS,
+    load_backtest_dates,
+    load_backtest_for_run_date,
+    load_backtest_series,
+)
+from app.schemas import (
+    BacktestDatesResponse,
+    BacktestResponse,
+    BacktestRow,
+    BacktestSeriesPoint,
+    BacktestSeriesResponse,
+)
 
 router = APIRouter(prefix="/plants", tags=["backtest"])
-
-SUPPORTED_PLANTS = frozenset({"quad_cities_1"})
 
 # Named historical run dates highlighted in the backtest report. Mirrors
 # HISTORICAL_BACKTEST_DATES in schemas.py — duplicated here as `date`
@@ -33,6 +42,30 @@ HISTORICAL_HIGHLIGHTS: tuple[date, ...] = (
 )
 
 
+@router.get("/{plant_id}/backtest/series", response_model=BacktestSeriesResponse)
+def get_backtest_series(
+    plant_id: str,
+    horizon: int = Query(7, ge=1, le=14, description="Forecast horizon in days"),
+    days: int = Query(
+        90, ge=1, le=1500, description="Trailing window length in days"
+    ),
+) -> BacktestSeriesResponse:
+    if plant_id not in SUPPORTED_PLANTS:
+        raise HTTPException(
+            status_code=404,
+            detail=f"plant_id={plant_id!r} not modeled in v1",
+        )
+    try:
+        rows = load_backtest_series(plant_id, horizon, days)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return BacktestSeriesResponse(
+        plant_id=plant_id,
+        horizon_days=horizon,
+        points=[BacktestSeriesPoint(**r) for r in rows],
+    )
+
+
 @router.get("/{plant_id}/backtest/dates", response_model=BacktestDatesResponse)
 def get_backtest_dates(plant_id: str) -> BacktestDatesResponse:
     if plant_id not in SUPPORTED_PLANTS:
@@ -41,7 +74,7 @@ def get_backtest_dates(plant_id: str) -> BacktestDatesResponse:
             detail=f"plant_id={plant_id!r} not modeled in v1",
         )
     try:
-        dates = load_backtest_dates()
+        dates = load_backtest_dates(plant_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     available = set(dates)
@@ -64,7 +97,7 @@ def get_backtest(
             detail=f"plant_id={plant_id!r} not modeled in v1",
         )
     try:
-        records = load_backtest_for_run_date(as_of)
+        records = load_backtest_for_run_date(plant_id, as_of)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     if not records:

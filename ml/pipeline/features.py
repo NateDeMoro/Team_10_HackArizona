@@ -35,7 +35,7 @@ from schemas import HEAT_DOSE_BASE_C, LAG_DAYS, ROLLING_CLOSED, ROLLING_WINDOWS 
 
 log = logging.getLogger(__name__)
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]  # ml/ (data lives at ml/data/)
 INTERIM_DIR = REPO_ROOT / "data" / "interim"
 
 # Columns used to build lags and rolling features. Kept narrow so the feature

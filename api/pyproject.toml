@@ -9,6 +9,7 @@ dependencies = [
     "pydantic>=2.9",
     "pandas>=2.2",
     "pyarrow>=18.0",
+    "psycopg[binary]>=3.2",
 ]
 
 [tool.uv]

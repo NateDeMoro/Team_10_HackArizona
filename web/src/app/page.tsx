@@ -12,33 +12,60 @@ import { ALERT_HEX, fmtDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
+// Per-plant 7-day headline derived from each modeled plant's forecast.
+// Shared between the map (badge color), the cards, and the legend.
+export type ForecastSummary = {
+  level: AlertLevel;
+  runDate: string;
+  pointPct: number;
+};
+
 type Catalog = {
   plants: Plant[];
-  qcLevel: AlertLevel | null;
-  qcRunDate: string | null;
-  qcPointPct: number | null;
+  // plant_id -> headline; absent when the forecast endpoint failed.
+  summaries: Record<string, ForecastSummary>;
 };
 
 async function fetchCatalog(): Promise<Catalog> {
   const plants = await listPlants();
-  let qcLevel: AlertLevel | null = null;
-  let qcRunDate: string | null = null;
-  let qcPointPct: number | null = null;
-  try {
-    const fc = await getForecast("quad_cities_1");
-    const h7 = fc.horizons.find((h) => h.horizon_days === 7) ?? fc.horizons[0];
-    qcLevel = h7?.alert_level ?? null;
-    qcRunDate = fc.run_date;
-    qcPointPct = h7?.point_pct ?? null;
-  } catch {
-    // leave nulls
-  }
-  return { plants, qcLevel, qcRunDate, qcPointPct };
+  const modeled = plants.filter((p) => p.modeled);
+  // Fetch every modeled plant's forecast in parallel; tolerate per-plant
+  // failures so one missing artifact doesn't blank the whole map.
+  const entries = await Promise.all(
+    modeled.map(async (p): Promise<[string, ForecastSummary] | null> => {
+      try {
+        const fc = await getForecast(p.id);
+        const h7 =
+          fc.horizons.find((h) => h.horizon_days === 7) ?? fc.horizons[0];
+        if (!h7) return null;
+        return [
+          p.id,
+          {
+            level: h7.alert_level,
+            runDate: fc.run_date,
+            pointPct: h7.point_pct,
+          },
+        ];
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const summaries: Record<string, ForecastSummary> = {};
+  for (const e of entries) if (e) summaries[e[0]] = e[1];
+  return { plants, summaries };
 }
 
 export default async function Home() {
-  const { plants, qcLevel, qcRunDate, qcPointPct } = await fetchCatalog();
+  const { plants, summaries } = await fetchCatalog();
   const modeled = plants.filter((p) => p.modeled);
+  // Use the latest run_date across modeled plants for the header label.
+  // All plants share the same ERA5 archive, so they should match — pick
+  // any non-null one rather than picking arbitrarily.
+  const headerRunDate =
+    modeled
+      .map((p) => summaries[p.id]?.runDate)
+      .find((d): d is string => Boolean(d)) ?? null;
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-10">
@@ -48,10 +75,10 @@ export default async function Home() {
         </h1>
         <p className="max-w-3xl text-sm text-[var(--ua-navy)]/75">
           Forecasts weather-driven cooling-water derating risk 1–14 days
-          ahead for US nuclear reactors. v1 ships a single fully-modeled
-          site (Quad Cities Unit 1, Mississippi River); the rest of the
-          catalog is shown on the map as placeholders to communicate
-          scaling.
+          ahead for US nuclear reactors. v1 ships two fully-modeled sites
+          (Quad Cities Unit 1 on the Mississippi and Byron Unit 1 on the
+          Rock River); the rest of the catalog is shown on the map as
+          placeholders to communicate scaling.
         </p>
       </header>
 
@@ -60,18 +87,14 @@ export default async function Home() {
           <h2 className="text-lg font-semibold text-[var(--ua-navy)]">
             US fleet
           </h2>
-          {qcRunDate ? (
+          {headerRunDate ? (
             <span className="text-xs text-[var(--ua-navy)]/60">
-              Forecast run: {fmtDate(qcRunDate)}
+              Forecast run: {fmtDate(headerRunDate)}
             </span>
           ) : null}
         </div>
-        <PlantMap
-          plants={plants}
-          qcAlertLevel={qcLevel}
-          qcPointPct={qcPointPct}
-        />
-        <Legend qcLevel={qcLevel} />
+        <PlantMap plants={plants} summaries={summaries} />
+        <Legend />
       </section>
 
       <section className="flex flex-col gap-3">
@@ -79,7 +102,9 @@ export default async function Home() {
           Modeled plants
         </h2>
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {modeled.map((p) => (
+          {modeled.map((p) => {
+            const summary = summaries[p.id];
+            return (
             <li key={p.id}>
               <Link
                 href={`/plants/${p.id}`}
@@ -96,19 +121,20 @@ export default async function Home() {
                         .join(" · ")}
                     </p>
                   </div>
-                  {qcLevel ? <AlertBadge level={qcLevel} /> : null}
+                  {summary ? <AlertBadge level={summary.level} /> : null}
                 </div>
                 <p className="mt-3 text-xs text-[var(--ua-navy)]/60">
                   7-day point forecast ·{" "}
                   <span className="font-mono text-[var(--ua-navy)]">
-                    {qcPointPct == null
+                    {summary == null
                       ? "no forecast cached"
-                      : `${qcPointPct.toFixed(1)}%`}
+                      : `${summary.pointPct.toFixed(1)}%`}
                   </span>
                 </p>
               </Link>
             </li>
-          ))}
+            );
+          })}
         </ul>
       </section>
 
@@ -127,7 +153,7 @@ export default async function Home() {
   );
 }
 
-function Legend({ qcLevel }: { qcLevel: AlertLevel | null }) {
+function Legend() {
   return (
     <div className="flex flex-wrap items-center gap-4 text-xs text-[var(--ua-navy)]/70">
       <span className="font-medium text-[var(--ua-navy)]">Map legend:</span>
@@ -144,14 +170,6 @@ function Legend({ qcLevel }: { qcLevel: AlertLevel | null }) {
         <span className="inline-block h-3 w-3 rounded-full bg-zinc-400/40 ring-1 ring-zinc-400" />
         placeholder (model coming soon)
       </span>
-      {qcLevel ? (
-        <span className="ml-auto text-[var(--ua-navy)]/70">
-          Quad Cities Unit 1:{" "}
-          <span className="font-medium capitalize text-[var(--ua-navy)]">
-            {qcLevel}
-          </span>
-        </span>
-      ) : null}
     </div>
   );
 }

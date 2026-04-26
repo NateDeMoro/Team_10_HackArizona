@@ -9,12 +9,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.data_loader import load_recent_actuals
+from app.data_loader import SUPPORTED_PLANTS, load_recent_actuals
 from app.schemas import ActualPoint, ActualsResponse
 
 router = APIRouter(prefix="/plants", tags=["actuals"])
-
-SUPPORTED_PLANTS = frozenset({"quad_cities_1"})
 
 
 @router.get("/{plant_id}/actuals", response_model=ActualsResponse)
@@ -28,7 +26,7 @@ def get_actuals(
             detail=f"plant_id={plant_id!r} not modeled in v1",
         )
     try:
-        rows = load_recent_actuals(days)
+        rows = load_recent_actuals(plant_id, days)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return ActualsResponse(

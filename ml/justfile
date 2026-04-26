@@ -1,8 +1,7 @@
 set dotenv-load := true
 
 # Default plant slug. All tiered recipes accept an explicit plant arg
-# (`just train byron_1`); omitting it falls back to this default. v1
-# inference/backtest are pinned to quad_cities_1 internally.
+# (`just train byron_1`); omitting it falls back to this default.
 default_plant := "quad_cities_1"
 
 # Tier 0 smoke test: imports + invokes every stub
@@ -25,9 +24,9 @@ features plant=default_plant:
 train plant=default_plant:
     uv run python -m pipeline.train --plant {{plant}}
 
-# Tier 4 (still QC-only; multi-plant API wiring is a separate task).
-backtest:
-    uv run python -m pipeline.backtest
+# Tier 4
+backtest plant=default_plant:
+    uv run python -m pipeline.backtest --plant {{plant}}
 
-forecast:
-    uv run python -m pipeline.inference
+forecast plant=default_plant:
+    uv run python -m pipeline.inference --plant {{plant}}

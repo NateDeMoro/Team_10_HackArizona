@@ -35,7 +35,7 @@ from schemas import (  # noqa: E402
 
 log = logging.getLogger(__name__)
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]  # ml/ (data lives at ml/data/)
 RAW_DIR = REPO_ROOT / "data" / "raw" / "weather"
 INTERIM_DIR = REPO_ROOT / "data" / "interim"
 
@@ -150,7 +150,9 @@ def _load_apikey() -> str:
     """Read the Open-Meteo paid-plan API key. Accepts the canonical name from
     .env.example (`OPENMETEO_API_KEY`) and the underscore variant
     (`OPEN_METEO_API_KEY`) some local .env files use."""
-    load_dotenv(REPO_ROOT / ".env")
+    # Walks up from cwd to find a .env (works for both `cd ml && python -m`
+    # locally and the Railway container where env vars are injected directly).
+    load_dotenv()
     for name in ("OPENMETEO_API_KEY", "OPEN_METEO_API_KEY"):
         key = os.environ.get(name, "").strip()
         if key:

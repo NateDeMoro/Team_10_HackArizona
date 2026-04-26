@@ -445,3 +445,24 @@ class BacktestDatesResponse(BaseModel):
     plant_id: str
     dates: list[date]
     highlights: list[date]
+
+
+class BacktestSeriesPoint(BaseModel):
+    """One realized + predicted pair at a single date for one horizon."""
+
+    date: date
+    actual_pct: float | None = None
+    point_pct: float
+
+
+class BacktestSeriesResponse(BaseModel):
+    """Trailing window of (date, actual, predicted) at one fixed horizon.
+
+    Powers the History view's "what would the model have predicted"
+    overlay: a single bulk request returns the full series so the chart
+    can render without one round trip per scrub.
+    """
+
+    plant_id: str
+    horizon_days: int
+    points: list[BacktestSeriesPoint]

@@ -20,12 +20,13 @@ Pipeline:
        out by full / summer-only / non-summer slices. Report empirical
        coverage of the [p10, p90] band on test.
     6. Persist (under data/artifacts/<slug>/):
-         model_h{H}_point.json    (14 boosters)
-         model_h{H}_q{10,90}.json (28 boosters when both quantiles are fit)
-         feature_columns.json     (column order contract)
-         metrics.json             (model + baselines)
-         band_deltas.json         (per-horizon symmetric band delta)
-         shap_summary_h7.png      (point h=7 model)
+         model_h{H}_point.json     (14 boosters)
+         model_h{H}_q{10,90}.json  (28 boosters when both quantiles are fit)
+         calibrator_h{H}.json      (14 isotonic calibrators fit on val)
+         feature_columns.json      (column order contract)
+         metrics.json              (model + baselines, raw and calibrated)
+         band_deltas.json          (per-horizon symmetric band delta)
+         shap_summary_h7.png       (point h=7 model)
 
 Re-running is idempotent — all outputs are overwritten in place.
 """
@@ -44,6 +45,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import xgboost as xgb
+from sklearn.isotonic import IsotonicRegression
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from plants import PLANTS, Plant, get_plant  # noqa: E402
@@ -64,7 +66,7 @@ from pipeline import baselines  # noqa: E402
 
 log = logging.getLogger(__name__)
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]  # ml/ (data lives at ml/data/)
 PROCESSED_DIR = REPO_ROOT / "data" / "processed"
 ARTIFACTS_DIR = REPO_ROOT / "data" / "artifacts"
 
@@ -159,6 +161,60 @@ def _fit_point(
         verbose=False,
     )
     return model
+
+
+# ---------- calibration --------------------------------------------------
+
+
+def _fit_calibrator(
+    raw_pred_val: np.ndarray, y_val: np.ndarray
+) -> IsotonicRegression:
+    """Fit a monotonic isotonic mapping raw_pred -> y on val.
+
+    The dip-weighted point objective leaves a systemic ~5pp negative bias
+    on the dominant 100% mode of power_pct (visible in metrics.json on the
+    `full` slice across every test year). Isotonic regression learns a
+    non-decreasing step function that corrects this without re-ordering
+    predictions. Clipped to [0, 100] to match the band post-processing.
+
+    The calibrator is fit on the full val set, but applied conditionally
+    at serve time (only when raw >= DIP_THRESHOLD_PCT) — see
+    `_apply_calibrator_gated` for the gate rationale.
+    """
+    cal = IsotonicRegression(out_of_bounds="clip", y_min=0.0, y_max=100.0)
+    cal.fit(raw_pred_val, y_val)
+    return cal
+
+
+def _apply_calibrator_gated(
+    raw: np.ndarray, calibrator: IsotonicRegression
+) -> np.ndarray:
+    """Apply isotonic only where raw >= DIP_THRESHOLD_PCT; pass-through below.
+
+    Mirror of inference._apply_calibrator so train-time band deltas and
+    metrics are computed on the same predictions the API will serve.
+    """
+    raw = np.asarray(raw, dtype=float)
+    calibrated = calibrator.predict(raw)
+    return np.where(raw >= DIP_THRESHOLD_PCT, calibrated, raw)
+
+
+def _save_calibrator(cal: IsotonicRegression, path: Path, n_val_rows: int) -> None:
+    """Persist the fitted breakpoints as JSON.
+
+    Storing X/y thresholds (rather than pickling the sklearn object) keeps
+    inference dependency-light: `np.interp` reproduces the clip-bounded
+    monotonic mapping with one numpy call. Pickle would couple us to the
+    sklearn version that fit the model; JSON does not.
+    """
+    payload = {
+        "x_thresholds": [float(x) for x in cal.X_thresholds_],
+        "y_thresholds": [float(y) for y in cal.y_thresholds_],
+        "y_min": 0.0,
+        "y_max": 100.0,
+        "n_val_rows": int(n_val_rows),
+    }
+    path.write_text(json.dumps(payload, indent=2))
 
 
 # ---------- metrics ------------------------------------------------------
@@ -280,8 +336,19 @@ def run(plant: Plant) -> None:
         point_path = artifacts_dir / f"model_h{h:02d}_point.json"
         point_model.save_model(str(point_path))
 
-        point_pred_val = point_model.predict(X_val)
-        point_pred_test = point_model.predict(X_test)
+        raw_pred_val = point_model.predict(X_val)
+        raw_pred_test = point_model.predict(X_test)
+
+        # Isotonic calibration corrects the systemic negative bias of the
+        # dip-weighted objective on the 100% mode. Fit on val, applied to
+        # both val (for band derivation) and test (for scoring).
+        log.info("  fit isotonic calibrator")
+        calibrator = _fit_calibrator(raw_pred_val, y_val)
+        cal_path = artifacts_dir / f"calibrator_h{h:02d}.json"
+        _save_calibrator(calibrator, cal_path, n_val_rows=len(y_val))
+
+        point_pred_val = _apply_calibrator_gated(raw_pred_val, calibrator)
+        point_pred_test = _apply_calibrator_gated(raw_pred_test, calibrator)
 
         # Baselines fit on the training window only (no val/test leak).
         clim_table = baselines.fit_climatology(train["date"], train["target"])
@@ -289,10 +356,15 @@ def run(plant: Plant) -> None:
             train["date"], train["target"], train["is_outage"]
         )
 
-        def baseline_block(eval_df: pd.DataFrame, model_pred: np.ndarray) -> dict:
+        def baseline_block(
+            eval_df: pd.DataFrame,
+            model_pred: np.ndarray,
+            raw_pred: np.ndarray,
+        ) -> dict:
             target_dates = pd.to_datetime(eval_df["date"]) + pd.Timedelta(days=h)
             preds = {
-                "model": model_pred,
+                "model": model_pred,  # calibrated — matches what the API serves
+                "model_uncalibrated": raw_pred,
                 "climatology": baselines.predict_climatology(clim_table, target_dates),
                 "climatology_refueling_aware": baselines.predict_climatology(
                     clim_aware_table, target_dates
@@ -302,15 +374,15 @@ def run(plant: Plant) -> None:
             y_true = eval_df["target"].to_numpy(dtype=float)
             return _slice_scores(eval_df["date"], y_true, preds)
 
-        # Symmetric uncertainty band derived from val-set absolute residuals:
-        # delta_h = (BAND_TARGET_COVERAGE)-th percentile of |point - actual|
+        # Symmetric uncertainty band derived from val-set absolute residuals
+        # of the calibrated point — must use the same calibrated values the
+        # API serves so the band stays operationally meaningful:
+        # delta_h = (BAND_TARGET_COVERAGE)-th percentile of |cal_point - actual|
         # on val. Published band is [point - delta_h, point + delta_h], an
         # approximate (BAND_TARGET_COVERAGE * 100)% prediction interval.
-        # We chose symmetric over one-sided downside because the dip-
-        # weighted point under-predicts on ~95% of val rows — there is no
-        # meaningful "additional downside" the point hasn't already priced.
-        # |residual| centered on the point captures the model's typical
-        # error magnitude in either direction.
+        # We chose symmetric over one-sided downside because the calibrated
+        # point sits close to the conditional mean — meaningful error
+        # magnitude exists in both directions.
         abs_residuals_val = np.abs(point_pred_val - y_val)
         n_val = len(abs_residuals_val)
         level = float(np.ceil((n_val + 1) * BAND_TARGET_COVERAGE) / n_val)
@@ -333,8 +405,8 @@ def run(plant: Plant) -> None:
             "best_iterations": {
                 "point": int(point_model.best_iteration or point_model.n_estimators),
             },
-            "val": baseline_block(val, point_pred_val),
-            "test": baseline_block(test, point_pred_test),
+            "val": baseline_block(val, point_pred_val, raw_pred_val),
+            "test": baseline_block(test, point_pred_test, raw_pred_test),
             "downside_band": downside_band,
         }
 

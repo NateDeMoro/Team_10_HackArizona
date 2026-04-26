@@ -10,12 +10,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.data_loader import load_recent_inputs
+from app.data_loader import SUPPORTED_PLANTS, load_recent_inputs
 from app.schemas import InputsResponse, WeatherInputPoint
 
 router = APIRouter(prefix="/plants", tags=["inputs"])
-
-SUPPORTED_PLANTS = frozenset({"quad_cities_1"})
 
 
 @router.get("/{plant_id}/inputs", response_model=InputsResponse)
@@ -29,7 +27,7 @@ def get_inputs(
             detail=f"plant_id={plant_id!r} not modeled in v1",
         )
     try:
-        rows = load_recent_inputs(days)
+        rows = load_recent_inputs(plant_id, days)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return InputsResponse(

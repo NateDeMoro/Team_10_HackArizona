@@ -1,0 +1,58 @@
+{
+  "h01": {
+    "delta_pct": 0.67132568359375,
+    "target_coverage": 0.8
+  },
+  "h02": {
+    "delta_pct": 0.369476318359375,
+    "target_coverage": 0.8
+  },
+  "h03": {
+    "delta_pct": 0.16699981689453125,
+    "target_coverage": 0.8
+  },
+  "h04": {
+    "delta_pct": 0.13100433349609375,
+    "target_coverage": 0.8
+  },
+  "h05": {
+    "delta_pct": 0.1381988525390625,
+    "target_coverage": 0.8
+  },
+  "h06": {
+    "delta_pct": 0.20201873779296875,
+    "target_coverage": 0.8
+  },
+  "h07": {
+    "delta_pct": 0.19957733154296875,
+    "target_coverage": 0.8
+  },
+  "h08": {
+    "delta_pct": 0.132049560546875,
+    "target_coverage": 0.8
+  },
+  "h09": {
+    "delta_pct": 0.1592254638671875,
+    "target_coverage": 0.8
+  },
+  "h10": {
+    "delta_pct": 0.2914581298828125,
+    "target_coverage": 0.8
+  },
+  "h11": {
+    "delta_pct": 0.29315948486328125,
+    "target_coverage": 0.8
+  },
+  "h12": {
+    "delta_pct": 0.18613433837890625,
+    "target_coverage": 0.8
+  },
+  "h13": {
+    "delta_pct": 0.1944427490234375,
+    "target_coverage": 0.8
+  },
+  "h14": {
+    "delta_pct": 0.1598968505859375,
+    "target_coverage": 0.8
+  }
+}

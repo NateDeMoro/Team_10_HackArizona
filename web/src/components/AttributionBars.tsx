@@ -1,4 +1,5 @@
 import type { FeatureContribution } from "@/lib/api";
+import { featureLabel } from "@/lib/featureLabels";
 import { fmtNumber } from "@/lib/format";
 
 type Props = {
@@ -34,8 +35,11 @@ export function AttributionBars({ features, baselinePct, pointPct, topN = 5 }: P
           const positive = f.contribution_pct >= 0;
           return (
             <li key={f.feature} className="flex items-center gap-2 text-xs">
-              <span className="w-44 truncate font-mono text-[var(--ua-navy)]/80">
-                {f.feature}
+              <span
+                className="w-56 truncate text-[var(--ua-navy)]/80"
+                title={f.feature}
+              >
+                {featureLabel(f.feature)}
               </span>
               <div className="relative flex h-4 flex-1 items-center">
                 <div className="absolute left-1/2 top-0 h-full w-px bg-[var(--ua-navy)]/20" />
