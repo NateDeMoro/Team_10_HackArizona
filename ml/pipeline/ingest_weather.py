@@ -1,10 +1,19 @@
-"""Open-Meteo customer-archive ingestion (Tier 2).
+"""Open-Meteo weather ingestion: ERA5 archive + live overlay (Tier 2).
 
-Use when: rebuilding the daily weather feature table for a given plant from
-Open-Meteo's paid ERA5 archive. Run via ``just features <slug>`` (chains
-all Tier 2 ingest scripts) or directly via
-``uv run python -m pipeline.ingest_weather --plant <slug>``.
-CLI flag ``--refresh`` re-fetches every year, ignoring the on-disk cache.
+Use when: rebuilding the daily weather feature table for a given plant.
+Two endpoints are combined per run:
+
+  1. Customer ERA5 archive — full history back to 2005, lags real time
+     by ~7 days.
+  2. Customer forecast endpoint — recent past (~10d) + near future
+     (~16d) of NWP-driven values, spliced over any archive-empty dates
+     so today's row is populated for live inference.
+
+Run via ``just features <slug>`` (chains all Tier 2 ingest scripts) or
+directly via ``uv run python -m pipeline.ingest_weather --plant <slug>``.
+``--refresh`` re-fetches every archive year. ``--skip-live`` disables
+the forecast splice (use during backtest rebuilds so the historical
+record stays ERA5-only).
 
 Output:
 - data/raw/weather/<slug>/{year}.parquet     (cached per-year hourly,
@@ -29,9 +38,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from plants import PLANTS, Plant, get_plant  # noqa: E402
 from schemas import (  # noqa: E402
     OPENMETEO_ARCHIVE_URL,
+    OPENMETEO_FORECAST_URL,
     WEATHER_ARCHIVE_END_LAG_DAYS,
     WEATHER_HOURLY_VARS,
 )
+
+# Live overlay window. The ERA5 archive lags ~7 days; we pull
+# `past_days` from the forecast endpoint to cover that gap and
+# `forecast_days` of forward NWP for any future-dated feature rows. The
+# Open-Meteo forecast endpoint accepts past_days up to 92 and
+# forecast_days up to 16, so 10 + 16 is well within limits and gives a
+# couple-day cushion against day-boundary races.
+LIVE_PAST_DAYS = 10
+LIVE_FORECAST_DAYS = 16
 
 log = logging.getLogger(__name__)
 
@@ -106,6 +125,46 @@ def _fetch_year(
     return df
 
 
+def _fetch_live(
+    plant_slug: str, lat: float, lon: float, apikey: str
+) -> pd.DataFrame:
+    """Pull a recent-past + near-future window from Open-Meteo's forecast
+    endpoint. Returns hourly rows with the same columns as the archive
+    fetch so the daily-aggregation pipeline is shared.
+
+    Use when: filling the ~7-day ERA5 archive gap so inference can
+    anchor at today rather than at the lagging archive max. Not cached
+    — always fresh per refresher run.
+    """
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "hourly": ",".join(WEATHER_HOURLY_VARS),
+        "past_days": LIVE_PAST_DAYS,
+        "forecast_days": LIVE_FORECAST_DAYS,
+        "timezone": "UTC",
+        "apikey": apikey,
+    }
+    log.info(
+        "weather %s live: fetching past=%d, forecast=%d (%d hourly vars)",
+        plant_slug,
+        LIVE_PAST_DAYS,
+        LIVE_FORECAST_DAYS,
+        len(WEATHER_HOURLY_VARS),
+    )
+    resp = requests.get(OPENMETEO_FORECAST_URL, params=params, timeout=120)
+    resp.raise_for_status()
+    payload = resp.json()
+    if "hourly" not in payload:
+        raise RuntimeError(f"weather live: unexpected payload (keys={list(payload)})")
+    hourly = payload["hourly"]
+    df = pd.DataFrame(hourly)
+    df["time"] = pd.to_datetime(df["time"], utc=True)
+    df = df.sort_values("time").reset_index(drop=True)
+    log.info("weather live: fetched %d hourly rows", len(df))
+    return df
+
+
 def _aggregate_daily(hourly: pd.DataFrame) -> pd.DataFrame:
     """Collapse hourly observations to UTC calendar-day aggregates."""
     if hourly.empty:
@@ -162,7 +221,7 @@ def _load_apikey() -> str:
     )
 
 
-def run(plant: Plant, refresh: bool = False) -> None:
+def run(plant: Plant, refresh: bool = False, skip_live: bool = False) -> None:
     INTERIM_DIR.mkdir(parents=True, exist_ok=True)
     apikey = _load_apikey()
     current_year = datetime.now(timezone.utc).year
@@ -187,6 +246,34 @@ def run(plant: Plant, refresh: bool = False) -> None:
     hourly = hourly.drop_duplicates(subset=["time"]).sort_values("time")
 
     daily = _aggregate_daily(hourly)
+
+    # Splice in live forecast/recent-past values to cover the ERA5
+    # archive lag and extend a few days into the future. Without this
+    # the most recent ~7 daily rows have NaN weather and inference falls
+    # back to a stale anchor date. Live overlay wins on rows it covers
+    # since archive rows there are NaN-only anyway; for any same-date
+    # collision the live value replaces archive (negligible drift in
+    # practice and the live value is the "as of now" truth the demo
+    # cares about).
+    if not skip_live:
+        try:
+            live_hourly = _fetch_live(plant.slug, plant.lat, plant.lon, apikey)
+            live_daily = _aggregate_daily(live_hourly)
+            if not live_daily.empty:
+                live_dates = set(live_daily["date"].unique())
+                daily = pd.concat(
+                    [daily[~daily["date"].isin(live_dates)], live_daily],
+                    ignore_index=True,
+                ).sort_values("date").reset_index(drop=True)
+                log.info(
+                    "weather live overlay: %d daily rows merged (%s -> %s)",
+                    len(live_daily),
+                    live_daily["date"].min().date(),
+                    live_daily["date"].max().date(),
+                )
+        except Exception:  # noqa: BLE001
+            log.exception("live overlay failed; serving archive-only weather")
+
     out = INTERIM_DIR / f"weather_{plant.slug}.parquet"
     daily.to_parquet(out, index=False)
     log.info(
@@ -215,8 +302,17 @@ def _main() -> None:
         action="store_true",
         help="Re-fetch every year, ignoring cached hourly Parquet.",
     )
+    parser.add_argument(
+        "--skip-live",
+        action="store_true",
+        help=(
+            "Do not splice the Open-Meteo forecast endpoint over the "
+            "archive. Useful for backtest rebuilds that should depend "
+            "only on ERA5."
+        ),
+    )
     args = parser.parse_args()
-    run(get_plant(args.plant), refresh=args.refresh)
+    run(get_plant(args.plant), refresh=args.refresh, skip_live=args.skip_live)
 
 
 if __name__ == "__main__":

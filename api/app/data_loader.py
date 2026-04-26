@@ -140,8 +140,8 @@ def load_recent_actuals(slug: str, days: int) -> list[dict]:
     return rows
 
 
-def load_history_month(slug: str, year: int, month: int) -> list[dict]:
-    """Every calendar day in (year, month) with realization, horizon-7
+def load_history_year(slug: str, year: int) -> list[dict]:
+    """Every calendar day in `year` with realization, horizon-7
     backtest prediction (if any), and a dip category.
 
     Refueling / pre-outage rows surface as power_pct=0 with is_outage=True
@@ -157,9 +157,7 @@ def load_history_month(slug: str, year: int, month: int) -> list[dict]:
     _ensure_supported(slug)
     df = _fetch_parquet(slug, "labels")
     df["date"] = pd.to_datetime(df["date"]).dt.date
-    df = df[
-        df["date"].apply(lambda d: d.year == year and d.month == month)
-    ].sort_values("date")
+    df = df[df["date"].apply(lambda d: d.year == year)].sort_values("date")
 
     pred_by_date: dict[date, float] = {}
     try:
@@ -168,11 +166,7 @@ def load_history_month(slug: str, year: int, month: int) -> list[dict]:
         ]
         bdf = bdf[bdf["horizon"] == 7].copy()
         bdf["target_date"] = pd.to_datetime(bdf["target_date"]).dt.date
-        bdf = bdf[
-            bdf["target_date"].apply(
-                lambda d: d.year == year and d.month == month
-            )
-        ]
+        bdf = bdf[bdf["target_date"].apply(lambda d: d.year == year)]
         for r in bdf.to_dict(orient="records"):
             pred_by_date[r["target_date"]] = float(r["point"])
     except FileNotFoundError:

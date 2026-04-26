@@ -147,7 +147,6 @@ export type HistoryPoint = {
 export type HistoryResponse = {
   plant_id: string;
   year: number;
-  month: number;
   points: HistoryPoint[];
 };
 
@@ -209,9 +208,9 @@ export const getBacktest = (plantId: string, asOf: string) =>
     `/plants/${encodeURIComponent(plantId)}/backtest?as_of=${asOf}`,
   );
 
-export const getHistoryMonth = (plantId: string, year: number, month: number) =>
+export const getHistoryYear = (plantId: string, year: number) =>
   getJson<HistoryResponse>(
-    `/plants/${encodeURIComponent(plantId)}/history?year=${year}&month=${month}`,
+    `/plants/${encodeURIComponent(plantId)}/history?year=${year}`,
   );
 
 export const getBacktestSeries = (

@@ -350,21 +350,28 @@ def attributions(plant_id: str, run_date: date) -> AttributionsResponse:
 
 
 def _latest_complete_run_date(df: pd.DataFrame) -> date:
-    """Most recent date for which the day-of weather features are populated.
+    """Most recent date <= today for which the day-of weather features are
+    populated.
 
-    Open-Meteo's ERA5 archive lags real time by ~5-7 days, so the last few
-    cached rows have NaN for `air_temp_c_max`. Inferring on those produces
-    nonsense (the model is given a row with most weather features missing).
-    For live demo use, anchor at the latest date that has a real same-day
-    weather observation — features.py will always populate air_temp_c_max
-    when the underlying ingest succeeded.
+    The ingest pipeline now splices Open-Meteo's forecast endpoint over
+    the ERA5 archive, so the parquet may contain populated rows for
+    today + future days as well. We clamp to today here because the
+    forecast horizons (1..14) project forward from `run_date` — anchoring
+    at a future date would silently push targets past the model's
+    trained horizon range. With the live overlay populated, this should
+    return `today`; without it, it falls back to the archive max as
+    before.
     """
-    if "air_temp_c_max" not in df.columns:
+    today = datetime.now(UTC).date()
+    today_ts = pd.Timestamp(today)
+    candidates = df[df["date"] <= today_ts]
+    if "air_temp_c_max" in candidates.columns:
+        populated = candidates.loc[candidates["air_temp_c_max"].notna(), "date"]
+        if len(populated) > 0:
+            return populated.max().date()
+    if len(candidates) == 0:
         return df["date"].max().date()
-    populated = df.loc[df["air_temp_c_max"].notna(), "date"]
-    if len(populated) == 0:
-        return df["date"].max().date()
-    return populated.max().date()
+    return candidates["date"].max().date()
 
 
 def run(plant_id: str) -> None:

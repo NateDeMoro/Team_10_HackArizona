@@ -521,9 +521,8 @@ class HistoryPoint(BaseModel):
 
 
 class HistoryResponse(BaseModel):
-    """All days in a single calendar month for the History view."""
+    """All days in a single calendar year for the History view."""
 
     plant_id: str
     year: int
-    month: int
     points: list[HistoryPoint]

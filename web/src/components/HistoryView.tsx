@@ -13,7 +13,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { getHistoryMonth, type DipCategory, type HistoryPoint } from "@/lib/api";
+import { getHistoryYear, type DipCategory, type HistoryPoint } from "@/lib/api";
 import { CHART_NAVY, fmtDate, fmtPct } from "@/lib/format";
 
 type Props = {
@@ -41,11 +41,6 @@ const CATEGORY_LABEL: Record<DipCategory, string> = {
   non_weather_dependent: "Non-weather dip",
   refueling: "Refueling outage",
 };
-
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
 
 type Row = HistoryPoint;
 
@@ -119,7 +114,6 @@ function ColoredDot({ cx, cy, payload, index }: DotProps) {
 export function HistoryView({ plantId, height = 300 }: Props) {
   const today = useMemo(() => new Date(), []);
   const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth() + 1);
   const [points, setPoints] = useState<HistoryPoint[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -128,7 +122,7 @@ export function HistoryView({ plantId, height = 300 }: Props) {
     let cancelled = false;
     setLoading(true);
     setErr(null);
-    getHistoryMonth(plantId, year, month)
+    getHistoryYear(plantId, year)
       .then((res) => {
         if (cancelled) return;
         setPoints(res.points);
@@ -143,7 +137,7 @@ export function HistoryView({ plantId, height = 300 }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [plantId, year, month]);
+  }, [plantId, year]);
 
   const yearOptions = useMemo(() => {
     const out: number[] = [];
@@ -172,18 +166,7 @@ export function HistoryView({ plantId, height = 300 }: Props) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3 text-xs">
-        <span className="font-medium text-[var(--ua-navy)]">Month:</span>
-        <select
-          value={month}
-          onChange={(e) => setMonth(Number(e.target.value))}
-          className="rounded-md border border-[var(--ua-navy)]/20 bg-white px-2 py-1 text-[var(--ua-navy)]"
-        >
-          {MONTHS.map((m, i) => (
-            <option key={m} value={i + 1}>
-              {m}
-            </option>
-          ))}
-        </select>
+        <span className="font-medium text-[var(--ua-navy)]">Year:</span>
         <select
           value={year}
           onChange={(e) => setYear(Number(e.target.value))}
@@ -209,7 +192,7 @@ export function HistoryView({ plantId, height = 300 }: Props) {
           </div>
         ) : !points || points.length < 2 ? (
           <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-[var(--ua-navy)]/30 text-sm text-[var(--ua-navy)]/60">
-            No data for {MONTHS[month - 1]} {year}.
+            No data for {year}.
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">

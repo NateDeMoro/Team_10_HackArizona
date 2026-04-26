@@ -155,9 +155,9 @@ export default async function PlantDetail({
             <HistoryView plantId={plant.id} />
           )}
         </div>
-        <aside className="rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm">
+        <aside className="rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm lg:self-start">
           <h2 className="mb-3 text-sm font-semibold text-[var(--ua-navy)]">
-            Recent inputs
+            Weather metric trend
           </h2>
           {inputs ? (
             <InputsPanel points={inputs.points} />

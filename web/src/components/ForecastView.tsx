@@ -57,9 +57,24 @@ function clampForDisplay(raw: number): number {
   return raw >= OPERATIONAL_DISPLAY_FLOOR ? OPERATIONAL_DISPLAY_CEILING : raw;
 }
 
+// Drop horizons whose target_date is already in the past. The ml
+// inference pipeline anchors run_date at the latest available ERA5
+// feature row, which lags ~7 days behind real time, so a fresh
+// forecast still includes target_dates before today. Filtering here
+// keeps the chart forward-looking without forcing a pipeline change.
+function todayIso(): string {
+  const d = new Date();
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function buildRows(forecast: HorizonPrediction[]): Row[] {
+  const today = todayIso();
   return forecast
     .slice()
+    .filter((h) => h.target_date >= today)
     .sort((a, b) => a.target_date.localeCompare(b.target_date))
     .map((h) => ({
       date: h.target_date,
