@@ -16,39 +16,38 @@ function Sparkline({ values, color }: { values: (number | null)[]; color: string
   if (populated.length < 2) {
     return <div className="h-9 text-xs text-[var(--ua-navy)]/40">no data</div>;
   }
+  // Span the sparkline across each series' own populated range so series with
+  // null edges (water temp, streamflow) draw the same horizontal extent as
+  // series that span all points (air temp).
+  const firstIdx = values.findIndex((v) => v != null);
+  let lastIdx = -1;
+  for (let i = values.length - 1; i >= 0; i--) {
+    if (values[i] != null) {
+      lastIdx = i;
+      break;
+    }
+  }
+  const idxSpan = lastIdx - firstIdx || 1;
   const min = Math.min(...populated);
   const max = Math.max(...populated);
   const span = max - min || 1;
-  const path = values
-    .map((v, i) => {
-      if (v == null) return null;
-      const x = (i / (values.length - 1)) * (w - 4) + 2;
-      const y = h - 2 - ((v - min) / span) * (h - 4);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .filter(Boolean);
-  // Draw as separate segments where nulls would have broken continuity.
+  // Build segments, breaking on internal nulls so gaps stay visible.
   const segments: string[] = [];
   let buf: string[] = [];
-  for (const v of values.map((v, i) => ({
-    v,
-    coord: v == null ? null : (() => {
-      const x = (i / (values.length - 1)) * (w - 4) + 2;
-      const y = h - 2 - ((v - min) / span) * (h - 4);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })(),
-  }))) {
-    if (v.coord == null) {
+  for (let i = firstIdx; i <= lastIdx; i++) {
+    const v = values[i];
+    if (v == null) {
       if (buf.length) {
         segments.push(`M${buf.join(" L")}`);
         buf = [];
       }
-    } else {
-      buf.push(v.coord);
+      continue;
     }
+    const x = ((i - firstIdx) / idxSpan) * (w - 4) + 2;
+    const y = h - 2 - ((v - min) / span) * (h - 4);
+    buf.push(`${x.toFixed(1)},${y.toFixed(1)}`);
   }
   if (buf.length) segments.push(`M${buf.join(" L")}`);
-  void path;
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="h-9 w-full" role="img">
       {segments.map((d, i) => (

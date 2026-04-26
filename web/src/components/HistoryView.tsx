@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  Area,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -98,6 +97,16 @@ function renderTooltip({
 type DotProps = { cx?: number; cy?: number; payload?: HistoryPoint; index?: number };
 function ColoredDot({ cx, cy, payload, index }: DotProps) {
   if (cx == null || cy == null || !payload) return null;
+  // Skip dots for the two "dense" categories so the line speaks for them:
+  // green operational stretches and red refueling stretches. Keep dots only
+  // for the rare/interesting events (yellow watch, violet non-weather dip).
+  if (payload.dip_category === "refueling") return null;
+  if (
+    payload.dip_category === "operational" &&
+    payload.power_pct >= WATCH_PCT
+  ) {
+    return null;
+  }
   return (
     <circle
       key={`hd-${index ?? payload.date}`}
@@ -145,23 +154,25 @@ export function HistoryView({ plantId, height = 300 }: Props) {
     return out;
   }, [today]);
 
-  // Fold the refuel-shade value into the main row so the chart has a
-  // single data source. Passing a separate `data` prop to the <Area>
-  // makes Recharts concatenate that array's X categories onto the
-  // axis, doubling the tick count and causing the dates to "loop"
-  // (Feb 1..Feb 26 then Feb 3..Feb 28 across the same width).
-  const chartData = useMemo(
-    () =>
-      (points ?? []).map((p) => ({
+  // Split the line into two series so the refueling stretches render in red
+  // while the rest stays black. Each segment includes its boundary point
+  // (the immediately adjacent neighbor) so the two lines visually connect
+  // without a gap at the transition.
+  const chartData = useMemo(() => {
+    const pts = points ?? [];
+    return pts.map((p, i) => {
+      const prev = pts[i - 1];
+      const next = pts[i + 1];
+      const refuelHere = p.is_outage;
+      const refuelAdj =
+        (prev?.is_outage ?? false) || (next?.is_outage ?? false);
+      return {
         ...p,
-        refuel: p.is_outage ? Y_MAX : null,
-      })),
-    [points],
-  );
-  const hasRefuel = useMemo(
-    () => (points ?? []).some((p) => p.is_outage),
-    [points],
-  );
+        value_main: refuelHere ? null : p.power_pct,
+        value_refuel: refuelHere || refuelAdj ? p.power_pct : null,
+      };
+    });
+  }, [points]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -227,26 +238,28 @@ export function HistoryView({ plantId, height = 300 }: Props) {
                 strokeOpacity={0.5}
                 strokeDasharray="2 4"
               />
-              {hasRefuel ? (
-                <Area
-                  dataKey="refuel"
-                  type="linear"
-                  fill={COLOR_RED}
-                  fillOpacity={0.18}
-                  stroke="none"
-                  isAnimationActive={false}
-                  legendType="none"
-                />
-              ) : null}
               <Line
                 type="linear"
-                dataKey="power_pct"
+                dataKey="value_main"
                 name="Actual"
                 stroke={COLOR_LINE}
                 strokeWidth={1.5}
                 dot={<ColoredDot />}
                 activeDot={{ r: 5 }}
                 isAnimationActive={false}
+                connectNulls={false}
+              />
+              <Line
+                type="linear"
+                dataKey="value_refuel"
+                name="Refueling"
+                stroke={COLOR_RED}
+                strokeWidth={1.5}
+                dot={false}
+                activeDot={{ r: 5 }}
+                isAnimationActive={false}
+                connectNulls={false}
+                legendType="none"
               />
             </ComposedChart>
           </ResponsiveContainer>
@@ -254,37 +267,43 @@ export function HistoryView({ plantId, height = 300 }: Props) {
       </div>
 
       <p className="text-xs text-[var(--ua-navy)]/60">
-        Each day is a colored dot — green ≥ 95%, yellow 90–95%, red &lt; 90%.
-        Violet marks non-weather-driven dips (model predicted ≥ 95% but
-        realization fell below 90%). Refueling outages pin to 0% and shade
-        red.
+        Operational days (≥ 95%) draw as the black trend line. Yellow dots
+        mark watch days (90–95%); violet dots mark non-weather-driven dips
+        (model predicted ≥ 95% but realization fell below 90%). Refueling
+        outages pin to 0% and render as a red line segment.
       </p>
     </div>
   );
 }
 
 function Legend() {
-  const items: { color: string; label: string }[] = [
-    { color: COLOR_GREEN, label: "Operational ≥ 95%" },
-    { color: COLOR_YELLOW, label: "Watch 90–95%" },
-    { color: COLOR_RED, label: "Alert < 90%" },
-    { color: COLOR_NON_WEATHER, label: "Non-weather dip" },
-  ];
   return (
     <div className="ml-auto flex flex-wrap items-center gap-3 text-[var(--ua-navy)]/70">
-      {items.map((it) => (
-        <span key={it.label} className="inline-flex items-center gap-1">
-          <span
-            className="inline-block h-2 w-2 rounded-full"
-            style={{ background: it.color }}
-          />
-          {it.label}
-        </span>
-      ))}
       <span className="inline-flex items-center gap-1">
         <span
-          className="inline-block h-2 w-3 rounded-sm"
-          style={{ background: COLOR_RED, opacity: 0.35 }}
+          className="inline-block h-0.5 w-4"
+          style={{ background: COLOR_LINE }}
+        />
+        Operational ≥ 95%
+      </span>
+      <span className="inline-flex items-center gap-1">
+        <span
+          className="inline-block h-2 w-2 rounded-full"
+          style={{ background: COLOR_YELLOW }}
+        />
+        Watch 90–95%
+      </span>
+      <span className="inline-flex items-center gap-1">
+        <span
+          className="inline-block h-2 w-2 rounded-full"
+          style={{ background: COLOR_NON_WEATHER }}
+        />
+        Non-weather dip
+      </span>
+      <span className="inline-flex items-center gap-1">
+        <span
+          className="inline-block h-0.5 w-4"
+          style={{ background: COLOR_RED }}
         />
         Refueling
       </span>
