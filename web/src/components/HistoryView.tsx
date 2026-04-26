@@ -8,7 +8,6 @@ import {
   Line,
   ReferenceLine,
   ResponsiveContainer,
-  Scatter,
   Tooltip,
   XAxis,
   YAxis,
@@ -22,24 +21,19 @@ type Props = {
   height?: number;
 };
 
-// Earliest year the labels parquet reaches (NRC daily power-status
-// archive starts 2005). Upper bound is the current year.
 const EARLIEST_YEAR = 2005;
 
-// Y-axis stays fixed [0, 102]. Gradient stops below are computed off this
-// domain — change here, change everywhere.
 const Y_MIN = 0;
 const Y_MAX = 102;
 
-// Tier thresholds. Mirror schemas.UI_ALERT_THRESHOLD_PCT (90) and
-// DIP_THRESHOLD_PCT (95).
 const WATCH_PCT = 95;
 const ALERT_PCT = 90;
 
+const COLOR_LINE = "#0a0a0a";
 const COLOR_GREEN = "#16a34a";
 const COLOR_YELLOW = "#ca8a04";
 const COLOR_RED = "#AB0520";
-const COLOR_NON_WEATHER = "#7c3aed"; // violet — distinct from the gradient
+const COLOR_NON_WEATHER = "#7c3aed";
 
 const CATEGORY_LABEL: Record<DipCategory, string> = {
   operational: "Operational",
@@ -55,10 +49,17 @@ const MONTHS = [
 
 type Row = HistoryPoint;
 
-function gradientStop(pct: number): string {
-  // Fraction down from the top of the chart in svg space.
-  const frac = (Y_MAX - pct) / (Y_MAX - Y_MIN);
-  return `${(frac * 100).toFixed(2)}%`;
+// Dot color combines the dip-category signal with the tier signal:
+// non-weather dips and refueling have their own colors so they remain
+// distinguishable; everything else is colored by capacity-factor tier
+// (green/yellow/red) so an "operational ≥ 95" day reads green at a
+// glance.
+function dotColor(p: HistoryPoint): string {
+  if (p.dip_category === "refueling") return COLOR_RED;
+  if (p.dip_category === "non_weather_dependent") return COLOR_NON_WEATHER;
+  if (p.power_pct >= WATCH_PCT) return COLOR_GREEN;
+  if (p.power_pct >= ALERT_PCT) return COLOR_YELLOW;
+  return COLOR_RED;
 }
 
 function renderTooltip({
@@ -73,12 +74,6 @@ function renderTooltip({
   if (!active || !payload || payload.length === 0) return null;
   const row = payload[0]?.payload;
   if (!row) return null;
-  const categoryColor =
-    row.dip_category === "operational"
-      ? COLOR_GREEN
-      : row.dip_category === "non_weather_dependent"
-        ? COLOR_NON_WEATHER
-        : COLOR_RED;
   return (
     <div className="rounded-md border border-[var(--ua-navy)]/20 bg-white px-3 py-2 text-xs shadow-md">
       <div className="font-semibold text-[var(--ua-navy)]">
@@ -98,10 +93,26 @@ function renderTooltip({
           Model (h=7): {fmtPct(row.prediction_pct)}
         </div>
       ) : null}
-      <div className="font-mono" style={{ color: categoryColor }}>
+      <div className="font-mono" style={{ color: dotColor(row) }}>
         {CATEGORY_LABEL[row.dip_category]}
       </div>
     </div>
+  );
+}
+
+type DotProps = { cx?: number; cy?: number; payload?: HistoryPoint; index?: number };
+function ColoredDot({ cx, cy, payload, index }: DotProps) {
+  if (cx == null || cy == null || !payload) return null;
+  return (
+    <circle
+      key={`hd-${index ?? payload.date}`}
+      cx={cx}
+      cy={cy}
+      r={3.5}
+      fill={dotColor(payload)}
+      stroke="#fff"
+      strokeWidth={1}
+    />
   );
 }
 
@@ -141,20 +152,6 @@ export function HistoryView({ plantId, height = 300 }: Props) {
   }, [today]);
 
   const refuelSegments = useMemo(() => buildRefuelArea(points), [points]);
-  const nonWeatherDots = useMemo(
-    () =>
-      (points ?? []).filter(
-        (p) => p.dip_category === "non_weather_dependent",
-      ),
-    [points],
-  );
-  const weatherDipDots = useMemo(
-    () =>
-      (points ?? []).filter((p) => p.dip_category === "weather_dependent"),
-    [points],
-  );
-
-  const gradientId = "history-stroke-grad";
 
   return (
     <div className="flex flex-col gap-3">
@@ -204,16 +201,6 @@ export function HistoryView({ plantId, height = 300 }: Props) {
               data={points}
               margin={{ top: 16, right: 24, bottom: 8, left: 0 }}
             >
-              <defs>
-                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={COLOR_GREEN} />
-                  <stop offset={gradientStop(WATCH_PCT)} stopColor={COLOR_GREEN} />
-                  <stop offset={gradientStop(WATCH_PCT)} stopColor={COLOR_YELLOW} />
-                  <stop offset={gradientStop(ALERT_PCT)} stopColor={COLOR_YELLOW} />
-                  <stop offset={gradientStop(ALERT_PCT)} stopColor={COLOR_RED} />
-                  <stop offset="100%" stopColor={COLOR_RED} />
-                </linearGradient>
-              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
               <XAxis
                 dataKey="date"
@@ -257,49 +244,27 @@ export function HistoryView({ plantId, height = 300 }: Props) {
                 type="linear"
                 dataKey="power_pct"
                 name="Actual"
-                stroke={`url(#${gradientId})`}
-                strokeWidth={2.25}
-                dot={false}
+                stroke={COLOR_LINE}
+                strokeWidth={1.5}
+                dot={<ColoredDot />}
+                activeDot={{ r: 5 }}
                 isAnimationActive={false}
               />
-              {weatherDipDots.length > 0 ? (
-                <Scatter
-                  data={weatherDipDots}
-                  dataKey="power_pct"
-                  fill={COLOR_RED}
-                  shape="circle"
-                  isAnimationActive={false}
-                  legendType="none"
-                />
-              ) : null}
-              {nonWeatherDots.length > 0 ? (
-                <Scatter
-                  data={nonWeatherDots}
-                  dataKey="power_pct"
-                  fill={COLOR_NON_WEATHER}
-                  shape="triangle"
-                  isAnimationActive={false}
-                  legendType="none"
-                />
-              ) : null}
             </ComposedChart>
           </ResponsiveContainer>
         )}
       </div>
 
       <p className="text-xs text-[var(--ua-navy)]/60">
-        Line color tracks tier (green ≥ 95%, yellow 90–95%, red &lt; 90%).
-        Refueling outages are pinned to 0% and shaded red. Triangles mark
-        non-weather-driven dips — days the model predicted full power but
-        realization fell below 90%.
+        Each day is a colored dot — green ≥ 95%, yellow 90–95%, red &lt; 90%.
+        Violet marks non-weather-driven dips (model predicted ≥ 95% but
+        realization fell below 90%). Refueling outages pin to 0% and shade
+        red.
       </p>
     </div>
   );
 }
 
-// Refueling shading is rendered as an Area whose value is Y_MAX on
-// outage days and null elsewhere. Recharts stops drawing when value is
-// null, which is exactly the segment behavior we want.
 function buildRefuelArea(
   points: HistoryPoint[] | null,
 ): { date: string; value: number | null }[] {
@@ -311,45 +276,30 @@ function buildRefuelArea(
 }
 
 function Legend() {
-  const items: { color: string; label: string; shape: "line" | "tri" | "dot" | "swatch" }[] = [
-    { color: COLOR_GREEN, label: "Operational ≥ 95%", shape: "line" },
-    { color: COLOR_YELLOW, label: "Watch 90–95%", shape: "line" },
-    { color: COLOR_RED, label: "Alert < 90%", shape: "line" },
-    { color: COLOR_NON_WEATHER, label: "Non-weather dip", shape: "tri" },
-    { color: COLOR_RED, label: "Refueling", shape: "swatch" },
+  const items: { color: string; label: string }[] = [
+    { color: COLOR_GREEN, label: "Operational ≥ 95%" },
+    { color: COLOR_YELLOW, label: "Watch 90–95%" },
+    { color: COLOR_RED, label: "Alert < 90%" },
+    { color: COLOR_NON_WEATHER, label: "Non-weather dip" },
   ];
   return (
     <div className="ml-auto flex flex-wrap items-center gap-3 text-[var(--ua-navy)]/70">
       {items.map((it) => (
         <span key={it.label} className="inline-flex items-center gap-1">
-          {it.shape === "line" ? (
-            <span
-              className="inline-block h-[2px] w-4"
-              style={{ background: it.color }}
-            />
-          ) : it.shape === "tri" ? (
-            <span
-              className="inline-block h-0 w-0"
-              style={{
-                borderLeft: "4px solid transparent",
-                borderRight: "4px solid transparent",
-                borderBottom: `7px solid ${it.color}`,
-              }}
-            />
-          ) : it.shape === "swatch" ? (
-            <span
-              className="inline-block h-2 w-3 rounded-sm"
-              style={{ background: it.color, opacity: 0.35 }}
-            />
-          ) : (
-            <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ background: it.color }}
-            />
-          )}
+          <span
+            className="inline-block h-2 w-2 rounded-full"
+            style={{ background: it.color }}
+          />
           {it.label}
         </span>
       ))}
+      <span className="inline-flex items-center gap-1">
+        <span
+          className="inline-block h-2 w-3 rounded-sm"
+          style={{ background: COLOR_RED, opacity: 0.35 }}
+        />
+        Refueling
+      </span>
     </div>
   );
 }

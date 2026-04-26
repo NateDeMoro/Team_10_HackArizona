@@ -19,18 +19,18 @@ import { CHART_NAVY, fmtDate, fmtPct } from "@/lib/format";
 const WATCH_PCT = 95;
 const ALERT_PCT = 90;
 
+const COLOR_LINE = "#0a0a0a";
 const COLOR_GREEN = "#16a34a";
 const COLOR_YELLOW = "#ca8a04";
 const COLOR_RED = "#AB0520";
 
-// Forecast chart's y-axis is clamped narrower than History so the tier
-// gradient stops are computed off this range.
 const Y_MIN = 60;
 const Y_MAX = 102;
 
-function gradientStop(pct: number): string {
-  const frac = (Y_MAX - pct) / (Y_MAX - Y_MIN);
-  return `${(frac * 100).toFixed(2)}%`;
+function tierColor(pct: number): string {
+  if (pct >= WATCH_PCT) return COLOR_GREEN;
+  if (pct >= ALERT_PCT) return COLOR_YELLOW;
+  return COLOR_RED;
 }
 
 type Props = {
@@ -80,12 +80,7 @@ function renderTooltip({
   if (!active || !payload || payload.length === 0) return null;
   const row = payload[0]?.payload;
   if (!row) return null;
-  const color =
-    row.forecastRaw >= WATCH_PCT
-      ? COLOR_GREEN
-      : row.forecastRaw >= ALERT_PCT
-        ? COLOR_YELLOW
-        : COLOR_RED;
+  const color = tierColor(row.forecastRaw);
   return (
     <div className="rounded-md border border-[var(--ua-navy)]/20 bg-white px-3 py-2 text-xs shadow-md">
       <div className="font-semibold text-[var(--ua-navy)]">
@@ -101,6 +96,22 @@ function renderTooltip({
   );
 }
 
+type DotProps = { cx?: number; cy?: number; payload?: Row; index?: number };
+function ForecastDot({ cx, cy, payload, index }: DotProps) {
+  if (cx == null || cy == null || !payload) return null;
+  return (
+    <circle
+      key={`fd-${index ?? payload.date}`}
+      cx={cx}
+      cy={cy}
+      r={4}
+      fill={tierColor(payload.forecastRaw)}
+      stroke="#fff"
+      strokeWidth={1}
+    />
+  );
+}
+
 export function ForecastView({ forecast, runDate, height = 300 }: Props) {
   const data = buildRows(forecast);
   if (data.length < 2) {
@@ -110,21 +121,10 @@ export function ForecastView({ forecast, runDate, height = 300 }: Props) {
       </div>
     );
   }
-  const gradientId = "forecast-stroke-grad";
   return (
     <div style={{ width: "100%", height }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 16, right: 24, bottom: 8, left: 0 }}>
-          <defs>
-            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={COLOR_GREEN} />
-              <stop offset={gradientStop(WATCH_PCT)} stopColor={COLOR_GREEN} />
-              <stop offset={gradientStop(WATCH_PCT)} stopColor={COLOR_YELLOW} />
-              <stop offset={gradientStop(ALERT_PCT)} stopColor={COLOR_YELLOW} />
-              <stop offset={gradientStop(ALERT_PCT)} stopColor={COLOR_RED} />
-              <stop offset="100%" stopColor={COLOR_RED} />
-            </linearGradient>
-          </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
           <XAxis
             dataKey="date"
@@ -170,16 +170,17 @@ export function ForecastView({ forecast, runDate, height = 300 }: Props) {
             type="linear"
             dataKey="forecast"
             name="Forecast"
-            stroke={`url(#${gradientId})`}
-            strokeWidth={2.5}
-            dot={false}
+            stroke={COLOR_LINE}
+            strokeWidth={1.5}
+            dot={<ForecastDot />}
+            activeDot={{ r: 5 }}
             isAnimationActive={false}
           />
         </LineChart>
       </ResponsiveContainer>
       <p className="mt-2 text-xs text-[var(--ua-navy)]/60">
         Anchored at run date {fmtDate(runDate)} — 14-day forward outlook.
-        Line color tracks tier (green ≥ 95%, yellow 90–95%, red &lt; 90%).
+        Each day is a colored dot — green ≥ 95%, yellow 90–95%, red &lt; 90%.
       </p>
     </div>
   );

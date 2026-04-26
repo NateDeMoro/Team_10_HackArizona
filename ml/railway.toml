@@ -6,3 +6,9 @@ dockerfilePath = "Dockerfile"
 # Daily at 07:00 UTC. Cron jobs should not auto-restart on completion.
 cronSchedule = "0 7 * * *"
 restartPolicyType = "NEVER"
+# Also run the refresher once at deploy time. Cron-mode services do not
+# execute CMD on deploy, so without this the api would serve whatever
+# artifacts were last written until the next 07:00 UTC tick. Failure here
+# blocks promotion, which is what we want — an empty/stale forecast_artifacts
+# table is the cause of api 500s on /plants and /forecast.
+preDeployCommand = "uv run python -m pipeline.refresh"
