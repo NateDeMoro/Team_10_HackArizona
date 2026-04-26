@@ -16,6 +16,7 @@ dependencies = [
     "openpyxl>=3.1",
     "pydantic>=2.9",
     "psycopg[binary]>=3.2",
+    "boto3>=1.39",
 ]
 
 [tool.uv]

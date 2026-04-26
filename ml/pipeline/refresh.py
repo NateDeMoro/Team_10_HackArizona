@@ -76,6 +76,13 @@ def _refresh_plant(slug: str) -> None:
     # edge advances daily as new actuals land. ~minutes per plant; the
     # backtest_results.parquet upload below picks up the refreshed bytes.
     _run(sys.executable, "-m", "pipeline.backtest", "--plant", slug)
+    # Briefing is best-effort. A Bedrock outage or auth failure should
+    # not fail the whole refresh; the upload step skips a missing
+    # artifact so the previous day's briefing keeps serving.
+    try:
+        _run(sys.executable, "-m", "pipeline.briefing", "--plant", slug)
+    except subprocess.CalledProcessError:
+        log.exception("[%s] briefing failed (non-fatal)", slug)
 
 
 def _plant_uploads(slug: str) -> list[tuple[str, Path]]:
@@ -84,6 +91,7 @@ def _plant_uploads(slug: str) -> list[tuple[str, Path]]:
     return [
         ("forecast",         plant_artifacts / "forecast_latest.json"),
         ("attributions",     plant_artifacts / "attributions_latest.json"),
+        ("briefing",         plant_artifacts / "briefing_latest.json"),
         ("backtest_metrics", plant_artifacts / "backtest_metrics.json"),
         ("backtest_results", plant_artifacts / "backtest_results.parquet"),
         ("labels",           INTERIM_DIR / f"labels_{slug}.parquet"),
@@ -106,6 +114,15 @@ def _upload_blob(
 
 def _upload_plant(conn: psycopg.Connection, slug: str) -> None:
     for artifact_type, path in _plant_uploads(slug):
+        # Briefing regeneration is best-effort; if today's run failed,
+        # leave whatever was already in postgres so the API keeps serving
+        # yesterday's briefing rather than blanking it.
+        if artifact_type == "briefing" and not path.exists():
+            log.warning(
+                "[%s] briefing artifact missing at %s; keeping prior PG value",
+                slug, path,
+            )
+            continue
         _upload_blob(conn, slug, artifact_type, path)
     conn.commit()
     log.info("[%s] all artifacts uploaded to postgres", slug)

@@ -3,15 +3,18 @@ import { notFound } from "next/navigation";
 
 import { AlertBadge } from "@/components/AlertBadge";
 import { AttributionBars } from "@/components/AttributionBars";
+import { BriefingCard } from "@/components/BriefingCard";
 import { ForecastView } from "@/components/ForecastView";
 import { HistoryView } from "@/components/HistoryView";
 import { InputsPanel } from "@/components/InputsPanel";
 import {
   getAttributions,
+  getBriefing,
   getForecast,
   getInputs,
   getPlant,
   type AttributionsResponse,
+  type BriefingResponse,
   type ForecastResponse,
   type InputsResponse,
   type Plant,
@@ -35,22 +38,30 @@ type DetailData = {
   forecast: ForecastResponse | null;
   inputs: InputsResponse | null;
   attributions: AttributionsResponse | null;
+  briefing: BriefingResponse | null;
 };
 
 async function fetchDetail(id: string): Promise<DetailData> {
   const plant = await getPlant(id);
   if (!plant.modeled) {
-    return { plant, forecast: null, inputs: null, attributions: null };
+    return {
+      plant,
+      forecast: null,
+      inputs: null,
+      attributions: null,
+      briefing: null,
+    };
   }
   // Fetch the static datasets in parallel; tolerate individual failures
   // so the page still renders the parts that loaded. The History view
   // owns its own actuals/backtest fetches because they vary with window.
-  const [forecast, inputs, attributions] = await Promise.all([
+  const [forecast, inputs, attributions, briefing] = await Promise.all([
     getForecast(id).catch(() => null),
     getInputs(id, 30).catch(() => null),
     getAttributions(id).catch(() => null),
+    getBriefing(id).catch(() => null),
   ]);
-  return { plant, forecast, inputs, attributions };
+  return { plant, forecast, inputs, attributions, briefing };
 }
 
 export default async function PlantDetail({
@@ -70,7 +81,7 @@ export default async function PlantDetail({
   } catch {
     notFound();
   }
-  const { plant, forecast, inputs, attributions } = data;
+  const { plant, forecast, inputs, attributions, briefing } = data;
 
   const headlineHorizon =
     forecast?.horizons.find((h) => h.horizon_days === 7) ?? forecast?.horizons[0];
@@ -155,15 +166,18 @@ export default async function PlantDetail({
             <HistoryView plantId={plant.id} />
           )}
         </div>
-        <aside className="rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm lg:self-start">
-          <h2 className="mb-3 text-sm font-semibold text-[var(--ua-navy)]">
-            Weather metric trend
-          </h2>
-          {inputs ? (
-            <InputsPanel points={inputs.points} />
-          ) : (
-            <NoData label="weather/water cache" />
-          )}
+        <aside className="flex flex-col gap-6 lg:self-start">
+          {briefing ? <BriefingCard briefing={briefing} /> : null}
+          <div className="rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm">
+            <h2 className="mb-3 text-sm font-semibold text-[var(--ua-navy)]">
+              Weather metric trend
+            </h2>
+            {inputs ? (
+              <InputsPanel points={inputs.points} />
+            ) : (
+              <NoData label="weather/water cache" />
+            )}
+          </div>
         </aside>
       </section>
 

@@ -33,6 +33,11 @@ backtest plant="quad_cities_1":
 forecast plant="quad_cities_1":
     cd ml && just forecast {{plant}}
 
+# Stretch goal: regenerate the LLM-authored plain-English briefing.
+# Requires AWS_BEARER_TOKEN_BEDROCK + BEDROCK_MODEL_ID in ml/.env.
+briefing plant="quad_cities_1":
+    cd ml && just briefing {{plant}}
+
 # Lint api + web
 lint:
     cd web && pnpm lint

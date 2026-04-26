@@ -28,8 +28,8 @@
     background: var(--bg);
     color: var(--ink);
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    font-size: 9.5pt;
-    line-height: 1.32;
+    font-size: 8pt;
+    line-height: 1.22;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -40,20 +40,19 @@
     padding: 0;
     display: flex;
     flex-direction: column;
-    min-height: 10.4in;
   }
 
   /* --- Banner header --- */
   header.banner {
     background: var(--navy);
     color: #fff;
-    border-top: 7px solid var(--red);
-    border-bottom: 4px solid var(--red);
-    padding: 12px 16px 11px;
-    margin-bottom: 9px;
+    border-top: 6px solid var(--red);
+    border-bottom: 3px solid var(--red);
+    padding: 7px 14px 6px;
+    margin-bottom: 6px;
   }
   header.banner h1 {
-    font-size: 22pt;
+    font-size: 17pt;
     margin: 0 0 2px;
     letter-spacing: 0.3px;
     font-weight: 700;
@@ -74,7 +73,7 @@
   }
 
   /* --- Section structure --- */
-  section { margin-bottom: 8px; }
+  section { margin-bottom: 5px; break-inside: avoid; page-break-inside: avoid; }
 
   h2.sect {
     font-size: 10pt;
@@ -91,18 +90,18 @@
   .grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 9px;
+    gap: 7px;
   }
   .grid-3 {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: 9px;
+    gap: 7px;
   }
 
   .card {
     border: 1px solid var(--navy-line);
     background: #fff;
-    padding: 9px 11px;
+    padding: 7px 10px;
   }
   .card h3 {
     font-size: 9.5pt;
@@ -169,11 +168,11 @@
   .kpi {
     border: 1px solid var(--navy-line);
     border-top: 4px solid var(--red);
-    padding: 8px 12px 10px;
+    padding: 6px 11px 8px;
     background: #fff;
   }
   .kpi .num {
-    font-size: 26pt;
+    font-size: 18pt;
     font-weight: 700;
     color: var(--navy);
     line-height: 1;
@@ -203,7 +202,7 @@
   .flow .step {
     background: #fff;
     border: 1px solid var(--navy-line);
-    padding: 8px 8px;
+    padding: 6px 7px;
     position: relative;
     text-align: center;
   }
@@ -238,7 +237,7 @@
   }
 
   /* --- Tag pills --- */
-  .pills { line-height: 1.85; }
+  .pills { line-height: 1.7; }
   .pill {
     display: inline-block;
     padding: 2px 8px;
@@ -254,16 +253,6 @@
     background: var(--red-soft);
     border-color: var(--red);
     color: var(--red);
-  }
-
-  footer.foot {
-    border-top: 2px solid var(--red);
-    margin-top: auto;
-    padding-top: 5px;
-    font-size: 8pt;
-    color: var(--muted);
-    display: flex;
-    justify-content: space-between;
   }
 
   .nowrap { white-space: nowrap; }
@@ -410,7 +399,7 @@
           <span class="pill">psycopg 3</span>
           <span class="pill">uvicorn</span>
           <span class="pill">boto3 (Bedrock)</span>
-          <span class="pill">Gemma 3 27B</span>
+          <span class="pill">Gemma 4</span>
         </div>
       </div>
       <div class="card">
@@ -429,10 +418,6 @@
     </div>
   </section>
 
-  <footer class="foot">
-    <span><b>Team 10 · HackArizona 2026</b> · Nuclear Energy Derating Forecaster</span>
-    <span>Backtest split: 2023-01-01 → present · 2 plants modeled · 28 trained boosters</span>
-  </footer>
 
 </div>
 </body>

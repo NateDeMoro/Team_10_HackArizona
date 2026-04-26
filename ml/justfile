@@ -30,3 +30,9 @@ backtest plant=default_plant:
 
 forecast plant=default_plant:
     uv run python -m pipeline.inference --plant {{plant}}
+
+# Stretch goal: produce briefing_latest.json via Bedrock (Gemma 3 27B).
+# Reads forecast_latest.json and attributions_latest.json from disk and
+# anchors at their run_date — run `just forecast` first.
+briefing plant=default_plant:
+    uv run python -m pipeline.briefing --plant {{plant}}

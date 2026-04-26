@@ -6,7 +6,7 @@ contract has a single source of truth.
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -439,6 +439,35 @@ class AttributionsResponse(BaseModel):
     plant_id: str
     run_date: date
     horizons: list[HorizonAttribution]
+
+
+class BriefingRiskDay(BaseModel):
+    """One flagged horizon in the LLM-generated briefing."""
+
+    target_date: date
+    horizon_days: int = Field(..., ge=1, le=14)
+    point_pct: float
+    alert_level: AlertLevel
+    explanation: str
+
+
+class BriefingResponse(BaseModel):
+    """Plain-English forecast briefing produced by Gemma 3 27B on Bedrock.
+
+    Generated daily during the ml refresh from the just-written forecast +
+    attributions context. Text only; the UI re-uses ForecastResponse for
+    visuals so any numeric drift stays bounded to the chart.
+    """
+
+    plant_id: str
+    run_date: date
+    generated_at: datetime
+    model_id: str
+    headline: str
+    risk_days: list[BriefingRiskDay]
+    drivers: list[str]
+    outlook: str
+    fallback: bool = False
 
 
 class BacktestDatesResponse(BaseModel):

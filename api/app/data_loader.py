@@ -56,6 +56,11 @@ def load_attributions(slug: str) -> dict:
     return _fetch_json(slug, "attributions")
 
 
+def load_briefing(slug: str) -> dict:
+    _ensure_supported(slug)
+    return _fetch_json(slug, "briefing")
+
+
 # ---------- backtest (rebuilt daily by the refresher) ------------------
 
 

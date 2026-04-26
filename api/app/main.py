@@ -7,7 +7,16 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import actuals, attributions, backtest, forecast, history, inputs, plants
+from app.routes import (
+    actuals,
+    attributions,
+    backtest,
+    briefing,
+    forecast,
+    history,
+    inputs,
+    plants,
+)
 
 log = logging.getLogger("api.main")
 
@@ -30,6 +39,7 @@ def _prewarm() -> None:
         load_attributions,
         load_backtest_dates,
         load_backtest_metrics,
+        load_briefing,
         load_eia_plants,
         load_forecast,
         load_recent_actuals,
@@ -46,6 +56,7 @@ def _prewarm() -> None:
         for label, call in (
             ("forecast",         lambda s=slug: load_forecast(s)),
             ("attributions",     lambda s=slug: load_attributions(s)),
+            ("briefing",         lambda s=slug: load_briefing(s)),
             ("backtest_metrics", lambda s=slug: load_backtest_metrics(s)),
             ("backtest_results", lambda s=slug: load_backtest_dates(s)),
             ("labels",           lambda s=slug: load_recent_actuals(s, 30)),
@@ -118,4 +129,5 @@ app.include_router(backtest.router)
 app.include_router(actuals.router)
 app.include_router(inputs.router)
 app.include_router(attributions.router)
+app.include_router(briefing.router)
 app.include_router(history.router)

@@ -91,6 +91,28 @@ export type AttributionsResponse = {
   horizons: HorizonAttribution[];
 };
 
+// --- Briefing (LLM-generated daily summary) -------------------------------
+
+export type BriefingRiskDay = {
+  target_date: string;
+  horizon_days: number;
+  point_pct: number;
+  alert_level: AlertLevel;
+  explanation: string;
+};
+
+export type BriefingResponse = {
+  plant_id: string;
+  run_date: string;
+  generated_at: string; // ISO datetime
+  model_id: string;
+  headline: string;
+  risk_days: BriefingRiskDay[];
+  drivers: string[];
+  outlook: string;
+  fallback: boolean;
+};
+
 // --- Backtest --------------------------------------------------------------
 
 export type BacktestRow = {
@@ -197,6 +219,11 @@ export const getInputs = (plantId: string, days = 30) =>
 export const getAttributions = (plantId: string) =>
   getJson<AttributionsResponse>(
     `/plants/${encodeURIComponent(plantId)}/attributions`,
+  );
+
+export const getBriefing = (plantId: string) =>
+  getJson<BriefingResponse>(
+    `/plants/${encodeURIComponent(plantId)}/briefing`,
   );
 
 export const getBacktestDates = (plantId: string) =>
