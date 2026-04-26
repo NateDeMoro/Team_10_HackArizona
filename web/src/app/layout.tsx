@@ -29,9 +29,9 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-white text-[var(--ua-navy)]">
+      <body className="min-h-full flex flex-col bg-[var(--ua-page-bg)] text-[var(--ua-navy)]">
         <div className="h-1.5 w-full bg-[var(--ua-red)]" />
-        <header className="border-b border-[var(--ua-navy)]/15 bg-white">
+        <header className="border-b border-[var(--ua-navy)]/15 bg-[var(--ua-page-bg)]">
           <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-3">
             <Link href="/" className="flex items-center gap-3">
               <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--ua-red)] font-bold text-white">

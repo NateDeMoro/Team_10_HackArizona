@@ -58,6 +58,9 @@
   --ua-navy: #0C234B;
   --ua-navy-dark: #061533;
   --ua-cream: #F8F4EC;
+  /* Soft, low-saturation cool tint for the page background. Cards stay
+   * white so they read as raised surfaces against the page wash. */
+  --ua-page-bg: #eef4fb;
 
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);

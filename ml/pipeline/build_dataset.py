@@ -85,7 +85,14 @@ def run(plant: Plant) -> None:
             f"labels file must contain exactly {plant.nrc_unit_name!r} rows"
         )
 
-    df = labels.merge(features, on="date", how="left").sort_values("date").reset_index(drop=True)
+    # Left-join from features (not labels) so the dataset's max date tracks
+    # the latest available feature row — Open-Meteo's live forecast splice
+    # extends weather through today + 14, and USGS lags only ~1 day. Joining
+    # from labels capped the dataset at NRC's last published day, which the
+    # daily refresher does not regenerate, so inference would silently
+    # anchor at a multi-day-stale run_date as the labels file aged.
+    # train.py drops rows with NaN target anyway, so training is unaffected.
+    df = features.merge(labels, on="date", how="left").sort_values("date").reset_index(drop=True)
 
     if df["date"].duplicated().any():
         raise RuntimeError("training dataset has duplicate date rows after join")

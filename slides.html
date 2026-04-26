@@ -281,7 +281,6 @@
       <span class="white">Forecaster</span>
     </h1>
     <div class="subtitle">Forecasting weather-driven nuclear power loss 1 to 14 days ahead so operators can capture energy that would otherwise be left on the table.</div>
-    <div class="meta">Track <strong>Energy Optimization</strong></div>
   </section>
 
   <!-- Slide 2 — What we built -->
@@ -290,11 +289,11 @@
     <div class="eyebrow">The Project</div>
     <h2>What We Built</h2>
     <ul>
-      <li>Uses historical data to <strong>predict</strong> how much power a nuclear plant will actually be able to produce over the next 14 days</li>
-      <li>Combines <strong>weather, river temperature, and streamflow</strong> with the plant's own historical performance</li>
-      <li>Delivered through a <strong>simple web dashboard</strong> with a live US map and per-plant detail pages</li>
-      <li>Lets operators <strong>see trouble coming</strong> before it shows up on the grid</li>
-      <li>Built on <strong>public data only</strong> — no proprietary feeds, fully reproducible</li>
+      <li>Uses historical data to predict how much power a nuclear plant will actually be able to produce over the next <strong>14</strong> days</li>
+      <li>Combines weather, river temperature, and streamflow with the plant's own historical performance</li>
+      <li>Delivered through a simple web dashboard with a live US map and per-plant detail pages</li>
+      <li>Lets operators see trouble coming before it shows up on the grid</li>
+      <li>Built on public data only — no proprietary feeds, fully reproducible</li>
     </ul>
   </section>
 
@@ -304,12 +303,12 @@
     <div class="eyebrow">The Problem</div>
     <h2>What Is Derating, And Why It Hurts</h2>
     <ul>
-      <li><strong>Derating</strong> is when a plant is forced to run below full power — capacity is there, but it cannot be used</li>
-      <li>Driven by <strong>hot weather and warm river water</strong> — cooling intake limits force operators to throttle down</li>
-      <li>Hits hardest <strong>during heatwaves</strong>, exactly when the grid needs every megawatt the most</li>
-      <li>A single summer of derating can cost <strong>$50M+ at one plant</strong>, $200M+ industry-wide each year</li>
-      <li>Today operators react <strong>after</strong> the dip starts — there is no public forecast of when it is coming</li>
-      <li>Result: <strong>wasted clean energy</strong>, expensive last-minute fossil backup, and avoidable grid strain</li>
+      <li>Derating is when a plant is forced to run below full power — capacity is there, but it cannot be used</li>
+      <li>Driven by hot weather and warm river water — cooling intake limits force operators to throttle down</li>
+      <li>Hits hardest during heatwaves, exactly when the grid needs every megawatt the most</li>
+      <li>A single summer of derating can cost <strong>$50M+</strong> at one plant, <strong>$200M+</strong> industry-wide each year</li>
+      <li>Today operators react after the dip starts — there is no public forecast of when it is coming</li>
+      <li>Result: wasted clean energy, expensive last-minute fossil backup, and avoidable grid strain</li>
     </ul>
   </section>
 
@@ -319,12 +318,12 @@
     <div class="eyebrow">Our Approach</div>
     <h2>How The Forecaster Solves It</h2>
     <ul>
-      <li>Outputs a <strong>three-tier alert</strong> for each day in the forecast window — operational, watch, or alert — alongside the predicted output percentage and an uncertainty band so operators see both the expected value and the range of likely outcomes</li>
-      <li>Trained on <strong>20+ years</strong> of plant power records, weather, and river data</li>
-      <li>One model <strong>per forecast horizon</strong> (1 through 14 days) — every day on the curve gets its own prediction</li>
-      <li>Uses <strong>live weather forecasts</strong> to project conditions forward, then translates those into expected plant output</li>
-      <li>Includes a <strong>replay mode</strong> proving the model would have called past heat-driven dips in advance</li>
-      <li>Architecture is <strong>plant-agnostic</strong> — adding a new reactor is a single config entry</li>
+      <li>Outputs a three-tier alert for each day in the forecast window — operational, watch, or alert — alongside the predicted output percentage and an uncertainty band so operators see both the expected value and the range of likely outcomes</li>
+      <li>Trained on <strong>20+</strong> years of plant power records, weather, and river data</li>
+      <li>One model per forecast horizon (<strong>1</strong> through <strong>14</strong> days) — every day on the curve gets its own prediction</li>
+      <li>Uses live weather forecasts to project conditions forward, then translates those into expected plant output</li>
+      <li>Includes a replay mode proving the model would have called past heat-driven dips in advance</li>
+      <li>Architecture is plant-agnostic — adding a new reactor is a single config entry</li>
     </ul>
   </section>
 
@@ -337,19 +336,19 @@
       <div>
         <div class="col-title">Energy Optimization</div>
         <ul>
-          <li><strong>Recover lost megawatts</strong> by scheduling maintenance and refueling around predicted dips — capturing even 10% of the U.S. fleet's annual weather-driven derating losses is an estimated <strong>~$20M per year</strong></li>
-          <li><strong>Smarter cooling tower usage</strong> — operators know when to spin them up and when they will not be needed, saving water and auxiliary power</li>
-          <li><strong>Pre-position reserves</strong> instead of scrambling for expensive peaker plants mid-heatwave</li>
-          <li><strong>Lower carbon</strong> grid response — clean baseload stays online longer</li>
+          <li>Recover lost megawatts by scheduling maintenance and refueling around predicted dips — capturing even <strong>10%</strong> of the U.S. fleet's annual weather-driven derating losses is an estimated <strong>~$20M</strong> per year</li>
+          <li>Smarter cooling tower usage — operators know when to spin them up and when they will not be needed, saving water and auxiliary power</li>
+          <li>Plan backup power in advance — grid operators can line up cheaper replacement generation days ahead instead of paying premium rates for emergency peaker plants once a heatwave hits</li>
+          <li>Lower carbon grid response — clean baseload stays online longer</li>
         </ul>
       </div>
       <div>
         <div class="col-title">Who Benefits</div>
         <ul>
-          <li><strong>Plant operators</strong> — fewer surprises, better dispatch decisions</li>
-          <li><strong>Grid operators (ISOs / RTOs)</strong> — earlier visibility into capacity risk</li>
-          <li><strong>Ratepayers</strong> — less reliance on costly backup generation during peak demand</li>
-          <li><strong>The grid as a whole</strong> — a more resilient, lower-emission energy system</li>
+          <li>Plant operators — fewer surprises, better dispatch decisions</li>
+          <li>Grid operators (ISOs / RTOs) — earlier visibility into capacity risk</li>
+          <li>Ratepayers — less reliance on costly backup generation during peak demand</li>
+          <li>The grid as a whole — a more resilient, lower-emission energy system</li>
         </ul>
       </div>
     </div>
