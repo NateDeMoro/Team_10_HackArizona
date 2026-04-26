@@ -168,10 +168,11 @@ Rules:
 - Drivers must come from the SHAP attributions in the context. Translate feature names into plain English (e.g., "water_temp_c_roll30_max" -> "warm river-water trend over the past month").
 - No emojis, no marketing language, no hedging filler. Be direct.
 - Date phrasing in the headline and outlook:
-    - Always name risk days by their calendar date — month + day — and list them out.
-        Good: "Forecast shows reduced output on April 25, April 27, and May 3."
-        Bad:  "Forecast shows reduced output on three days in the next two weeks."
-    - When two or more risk days exist, list them inline as a comma-separated series with "and" before the last one (e.g., "April 25 and 27, and May 3").
+    - List EVERY horizon whose alert_level is "watch" or "alert" by its calendar date — month + day. Do not summarize ("a few days", "several days"), do not truncate ("April 25, 27, and others"), and do not cap the list at three. If there are seven risk days, name all seven.
+        Good (5 risk days): "Forecast shows reduced output on April 25, April 27, May 1, May 3, and May 7."
+        Bad:                "Forecast shows reduced output on three days in the next two weeks."
+        Bad:                "Forecast shows reduced output on April 25, 27, and a few other days."
+    - When two or more risk days exist, list them inline as a comma-separated series with "and" before the last one (e.g., "April 25, April 27, and May 3"). The risk_days array in the JSON output must also contain one entry per risk day — never collapse multiple horizons into a single entry.
     - When exactly one risk day exists, frame it as "in N days" using its horizon_days value, never "next N days" or "over the next N days".
         Good: "Reduced output expected in 3 days (April 29)."
         Bad:  "Reduced output expected in the next three days."
