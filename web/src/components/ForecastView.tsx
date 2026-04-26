@@ -193,10 +193,6 @@ export function ForecastView({ forecast, runDate, height = 300 }: Props) {
           />
         </LineChart>
       </ResponsiveContainer>
-      <p className="mt-2 text-xs text-[var(--ua-navy)]/60">
-        Anchored at run date {fmtDate(runDate)} — 14-day forward outlook.
-        Each day is a colored dot — green ≥ 95%, yellow 90–95%, red &lt; 90%.
-      </p>
     </div>
   );
 }
