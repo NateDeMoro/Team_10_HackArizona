@@ -159,24 +159,65 @@ export function HistoryView({ plantId, height = 300 }: Props) {
     return out;
   }, [today]);
 
-  // Split the line into two series so the refueling + recovery stretches
-  // render in blue while the rest stays green. A day belongs to the blue
-  // series if it is an outage OR a post-refuel-recovery day; each segment
-  // also includes its boundary point (the immediately adjacent neighbor)
-  // so the two lines visually connect without a gap at the transition.
+  // Split the line into four colored series so each stretch reads by cause:
+  //   green  - operational days
+  //   blue   - refueling + ramp-back recovery
+  //   red    - weather-driven dip events
+  //   magenta- non-weather-driven dip events
+  // A "dip event" is a contiguous run of weather/non-weather days. The whole
+  // event takes the magenta color if any day inside it is non-weather, else
+  // red — so the slope down to the trough and back up to 95% reads as one
+  // event, not as a per-day patchwork. Each colored series also carries its
+  // boundary points (the adjacent operational/recovery day on either side)
+  // so the line visually connects without a gap at the transition.
   const chartData = useMemo(() => {
     const pts = points ?? [];
+    type DipColor = "red" | "magenta";
+    const dipColor: (DipColor | null)[] = pts.map(() => null);
+    let i = 0;
+    while (i < pts.length) {
+      const c = pts[i].dip_category;
+      if (c === "weather_dependent" || c === "non_weather_dependent") {
+        let j = i;
+        let hasNonWeather = false;
+        while (
+          j < pts.length &&
+          (pts[j].dip_category === "weather_dependent" ||
+            pts[j].dip_category === "non_weather_dependent")
+        ) {
+          if (pts[j].dip_category === "non_weather_dependent") {
+            hasNonWeather = true;
+          }
+          j += 1;
+        }
+        const color: DipColor = hasNonWeather ? "magenta" : "red";
+        for (let k = i; k < j; k += 1) dipColor[k] = color;
+        i = j;
+      } else {
+        i += 1;
+      }
+    }
+
     const isBlue = (p?: HistoryPoint) =>
       !!p && (p.is_outage || p.dip_category === "post_refuel_recovery");
-    return pts.map((p, i) => {
-      const prev = pts[i - 1];
-      const next = pts[i + 1];
+
+    return pts.map((p, idx) => {
+      const prev = pts[idx - 1];
+      const next = pts[idx + 1];
       const blueHere = isBlue(p);
       const blueAdj = isBlue(prev) || isBlue(next);
+      const redHere = dipColor[idx] === "red";
+      const redAdj = dipColor[idx - 1] === "red" || dipColor[idx + 1] === "red";
+      const magHere = dipColor[idx] === "magenta";
+      const magAdj =
+        dipColor[idx - 1] === "magenta" || dipColor[idx + 1] === "magenta";
+      const inDip = dipColor[idx] !== null;
       return {
         ...p,
-        value_main: blueHere ? null : p.power_pct,
+        value_main: blueHere || inDip ? null : p.power_pct,
         value_refuel: blueHere || blueAdj ? p.power_pct : null,
+        value_weather: redHere || redAdj ? p.power_pct : null,
+        value_non_weather: magHere || magAdj ? p.power_pct : null,
       };
     });
   }, [points]);
@@ -199,7 +240,7 @@ export function HistoryView({ plantId, height = 300 }: Props) {
         <Legend />
       </div>
 
-      <div style={{ width: "100%", height }}>
+      <div style={{ width: "100%", height, minWidth: 0 }}>
         {err ? (
           <div className="flex h-full items-center justify-center text-sm text-[var(--ua-red)]">
             {err}
@@ -268,17 +309,42 @@ export function HistoryView({ plantId, height = 300 }: Props) {
                 connectNulls={false}
                 legendType="none"
               />
+              <Line
+                type="linear"
+                dataKey="value_weather"
+                name="Weather dip"
+                stroke={COLOR_RED}
+                strokeWidth={1.75}
+                dot={<ColoredDot />}
+                activeDot={{ r: 5 }}
+                isAnimationActive={false}
+                connectNulls={false}
+                legendType="none"
+              />
+              <Line
+                type="linear"
+                dataKey="value_non_weather"
+                name="Non-weather dip"
+                stroke={COLOR_NON_WEATHER}
+                strokeWidth={1.75}
+                dot={<ColoredDot />}
+                activeDot={{ r: 5 }}
+                isAnimationActive={false}
+                connectNulls={false}
+                legendType="none"
+              />
             </ComposedChart>
           </ResponsiveContainer>
         )}
       </div>
 
       <p className="text-xs text-[var(--ua-navy)]/60">
-        Operational days (≥ 95%) draw as the green trend line. Yellow dots
-        mark watch days (90–95%); magenta dots mark non-weather-driven dips
-        (model predicted ≥ 95% but realization fell below 90%). Refueling
-        outages and the reactor ramp-back that follows render as a bold
-        blue line until the plant returns to ≥ 95%.
+        The trend line is colored by what caused the dip: green when the
+        plant is operational (≥ 95%), red across weather-driven dip events,
+        magenta across non-weather-driven dip events (model predicted ≥ 95%
+        but realization fell below 90% on at least one day in the event),
+        and bold blue across refueling outages and the reactor ramp-back
+        that follows until the plant returns to ≥ 95%.
       </p>
     </div>
   );
@@ -296,14 +362,14 @@ function Legend() {
       </span>
       <span className="inline-flex items-center gap-1">
         <span
-          className="inline-block h-2 w-2 rounded-full"
-          style={{ background: COLOR_YELLOW }}
+          className="inline-block h-0.5 w-4"
+          style={{ background: COLOR_RED }}
         />
-        Watch 90–95%
+        Weather dip
       </span>
       <span className="inline-flex items-center gap-1">
         <span
-          className="inline-block h-2 w-2 rounded-full"
+          className="inline-block h-0.5 w-4"
           style={{ background: COLOR_NON_WEATHER }}
         />
         Non-weather dip

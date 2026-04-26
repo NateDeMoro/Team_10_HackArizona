@@ -144,7 +144,7 @@ export default async function PlantDetail({
       </header>
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-        <div className="rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm lg:col-span-3">
+        <div className="min-w-0 rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm lg:col-span-3">
           <div className="mb-3 flex items-baseline justify-between gap-3">
             <ViewToggle plantId={plant.id} active={view} />
             {forecast ? (

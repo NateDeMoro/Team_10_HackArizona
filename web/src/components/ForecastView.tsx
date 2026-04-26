@@ -137,7 +137,7 @@ export function ForecastView({ forecast, runDate, height = 300 }: Props) {
     );
   }
   return (
-    <div style={{ width: "100%", height }}>
+    <div style={{ width: "100%", height, minWidth: 0 }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 16, right: 24, bottom: 8, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
