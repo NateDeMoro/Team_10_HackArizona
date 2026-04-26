@@ -27,7 +27,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from schemas import LAG_DAYS, ROLLING_CLOSED, ROLLING_WINDOWS  # noqa: E402
+from schemas import HEAT_DOSE_BASE_C, LAG_DAYS, ROLLING_CLOSED, ROLLING_WINDOWS  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -44,12 +44,14 @@ LAG_COLS = (
     "heat_index_c",
     "water_temp_c",
     "streamflow_cfs",
+    "water_thermal_stress",
 )
 ROLL_COLS = (
     "air_temp_c_max",
     "wet_bulb_c",
     "water_temp_c",
     "streamflow_cfs",
+    "water_thermal_stress",
 )
 
 
@@ -97,10 +99,41 @@ def heat_index_c(temp_c: pd.Series, rh_pct: pd.Series) -> pd.Series:
 
 
 def _add_derived(df: pd.DataFrame) -> pd.DataFrame:
-    """Add wet-bulb and heat-index columns derived from daily-mean inputs."""
+    """Add wet-bulb, heat-index, and thermal-load interaction columns.
+
+    `water_thermal_stress` is a same-day proxy for cooling-capacity strain:
+    warm river water + low streamflow both raise it, since the reactor's
+    thermal-discharge limit binds when the river can't dilute waste heat.
+    Defined as `water_temp_c / log1p(streamflow_cfs)` to compress the
+    streamflow tail (Mississippi flow varies over orders of magnitude) and
+    keep the feature numerically well-behaved when temp data is missing.
+    """
     df = df.copy()
     df["wet_bulb_c"] = stull_wet_bulb_c(df["air_temp_c_mean"], df["rh_pct_mean"])
     df["heat_index_c"] = heat_index_c(df["air_temp_c_mean"], df["rh_pct_mean"])
+    flow = df["streamflow_cfs"].astype(float)
+    df["water_thermal_stress"] = (
+        df["water_temp_c"].astype(float) / np.log1p(flow.where(flow > 0))
+    )
+    return df
+
+
+def _add_heat_dose(df: pd.DataFrame) -> pd.DataFrame:
+    """Cumulative degree-days above HEAT_DOSE_BASE_C over the prior 7 / 14 days.
+
+    Uses closed='left' so row t only sees days strictly before t — no leakage.
+    Heat-dose captures persistence-of-heatwave that single-day max temperature
+    misses; QC1 derates require both heat magnitude and duration so river
+    water has time to warm.
+    """
+    df = df.copy()
+    excess = (df["air_temp_c_max"].astype(float) - HEAT_DOSE_BASE_C).clip(lower=0.0)
+    df["heat_dose_7d"] = excess.rolling(
+        window=7, min_periods=3, closed=ROLLING_CLOSED
+    ).sum()
+    df["heat_dose_14d"] = excess.rolling(
+        window=14, min_periods=5, closed=ROLLING_CLOSED
+    ).sum()
     return df
 
 
@@ -178,6 +211,7 @@ def run() -> None:
         df["water_site_id"] = df["water_site_id"].astype("category")
 
     df = _add_derived(df)
+    df = _add_heat_dose(df)
     df = _add_lags(df, LAG_COLS, LAG_DAYS)
     df = _add_rolling(df, ROLL_COLS, ROLLING_WINDOWS)
     df = _add_seasonality(df)

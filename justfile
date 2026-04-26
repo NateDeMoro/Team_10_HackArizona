@@ -20,6 +20,10 @@ train:
 backtest:
     cd ml && just backtest
 
+# Tier 4 forecast: refresh the precomputed JSON the API serves
+forecast:
+    cd ml && just forecast
+
 # Lint api + web
 lint:
     cd web && pnpm lint
