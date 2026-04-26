@@ -7,13 +7,22 @@ type Props = {
   baselinePct: number;
   pointPct: number;
   topN?: number;
+  compact?: boolean;
 };
 
 /** Horizontal bars of signed SHAP contributions in capacity-factor pp.
- *  Positive (navy) push the prediction up, negative (red) push it down. */
-export function AttributionBars({ features, baselinePct, pointPct, topN = 5 }: Props) {
+ *  Positive (navy) push the prediction up, negative (red) push it down.
+ *  `compact` narrows the label column for use in the smaller side panel. */
+export function AttributionBars({
+  features,
+  baselinePct,
+  pointPct,
+  topN = 5,
+  compact = false,
+}: Props) {
   const top = features.slice(0, topN);
   const max = Math.max(0.01, ...top.map((f) => Math.abs(f.contribution_pct)));
+  const labelWidth = compact ? "w-36" : "w-56";
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between text-xs text-[var(--ua-navy)]/60">
@@ -36,7 +45,7 @@ export function AttributionBars({ features, baselinePct, pointPct, topN = 5 }: P
           return (
             <li key={f.feature} className="flex items-center gap-2 text-xs">
               <span
-                className="w-56 truncate text-[var(--ua-navy)]/80"
+                className={`${labelWidth} truncate text-[var(--ua-navy)]/80`}
                 title={f.feature}
               >
                 {featureLabel(f.feature)}

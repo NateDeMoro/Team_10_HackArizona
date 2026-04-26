@@ -5,16 +5,6 @@ import { fmtDate } from "@/lib/format";
 type Props = { briefing: BriefingResponse };
 
 export function BriefingCard({ briefing }: Props) {
-  const generated = new Date(briefing.generated_at).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "UTC",
-    timeZoneName: "short",
-  });
-
   return (
     <section className="rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-baseline justify-between gap-3">
@@ -93,7 +83,7 @@ export function BriefingCard({ briefing }: Props) {
       ) : null}
 
       <p className="mt-4 text-[10px] text-[var(--ua-navy)]/50">
-        Generated {generated} · {briefing.model_id}
+        google.gemma-4
       </p>
     </section>
   );

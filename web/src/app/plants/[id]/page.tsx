@@ -144,61 +144,74 @@ export default async function PlantDetail({
       </header>
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-        <div className="min-w-0 rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm lg:col-span-3">
-          <div className="mb-3 flex items-baseline justify-between gap-3">
-            <ViewToggle plantId={plant.id} active={view} />
-            {forecast ? (
-              <span className="text-xs text-[var(--ua-navy)]/60">
-                Run {fmtDate(forecast.run_date)} · source {forecast.source}
-              </span>
-            ) : null}
-          </div>
-          {view === "forecast" ? (
-            forecast ? (
-              <ForecastView
-                forecast={forecast.horizons}
-                runDate={forecast.run_date}
-              />
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-3">
+          <div className="min-w-0 rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <ViewToggle plantId={plant.id} active={view} />
+              {forecast ? (
+                <span className="text-xs text-[var(--ua-navy)]/60">
+                  Run {fmtDate(forecast.run_date)} · source {forecast.source}
+                </span>
+              ) : null}
+            </div>
+            {view === "forecast" ? (
+              forecast ? (
+                <ForecastView
+                  forecast={forecast.horizons}
+                  runDate={forecast.run_date}
+                />
+              ) : (
+                <NoData label="forecast cache" />
+              )
             ) : (
-              <NoData label="forecast cache" />
-            )
-          ) : (
-            <HistoryView plantId={plant.id} />
-          )}
-        </div>
-        <aside className="flex flex-col gap-6 lg:self-start">
-          {briefing ? <BriefingCard briefing={briefing} /> : null}
-          <div className="rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm">
-            <h2 className="mb-3 text-sm font-semibold text-[var(--ua-navy)]">
-              Weather metric trend
-            </h2>
-            {inputs ? (
-              <InputsPanel points={inputs.points} />
-            ) : (
-              <NoData label="weather/water cache" />
+              <HistoryView plantId={plant.id} />
             )}
           </div>
-        </aside>
-      </section>
 
-      <section className="rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="text-sm font-semibold text-[var(--ua-navy)]">
-            Top features driving the 7-day forecast
-          </h2>
-          <span className="text-xs text-[var(--ua-navy)]/60">
-            SHAP, capacity-factor pp
-          </span>
+          <div className="grid min-w-0 grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="min-w-0 rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm md:col-span-2">
+              <div className="mb-3 flex items-baseline justify-between gap-2">
+                <h2 className="text-sm font-semibold text-[var(--ua-navy)]">
+                  Top features driving the 7-day forecast
+                </h2>
+                <span className="text-xs text-[var(--ua-navy)]/60">
+                  SHAP, capacity-factor pp
+                </span>
+              </div>
+              {headlineAttribution ? (
+                <AttributionBars
+                  features={headlineAttribution.top_features}
+                  baselinePct={headlineAttribution.baseline_pct}
+                  pointPct={headlineAttribution.point_pct}
+                  compact
+                />
+              ) : (
+                <NoData label="attributions cache" />
+              )}
+            </div>
+
+            <div className="min-w-0 rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex flex-col gap-0.5">
+                <h2 className="text-sm font-semibold text-[var(--ua-navy)]">
+                  Weather inputs feeding the 14-day forecast
+                </h2>
+                <span className="text-[11px] text-[var(--ua-navy)]/60">
+                  Trailing 30-day conditions the model uses to project the
+                  next 14 days
+                </span>
+              </div>
+              {inputs ? (
+                <InputsPanel points={inputs.points} />
+              ) : (
+                <NoData label="weather/water cache" />
+              )}
+            </div>
+          </div>
         </div>
-        {headlineAttribution ? (
-          <AttributionBars
-            features={headlineAttribution.top_features}
-            baselinePct={headlineAttribution.baseline_pct}
-            pointPct={headlineAttribution.point_pct}
-          />
-        ) : (
-          <NoData label="attributions cache" />
-        )}
+
+        <aside className="lg:self-start">
+          {briefing ? <BriefingCard briefing={briefing} /> : null}
+        </aside>
       </section>
 
       <footer className="border-t-2 border-[var(--ua-red)]/30 pt-6 text-xs text-[var(--ua-navy)]/70">
