@@ -18,7 +18,13 @@ import psycopg
 # Sentinel plant_id for artifacts that aren't plant-scoped (e.g. EIA-860).
 GLOBAL_PLANT = "_global"
 
-_TTL_SECONDS = 300
+# Cache lifetime is a safety net only — the watcher in main.py already
+# invalidates the cache as soon as the refresher cron writes new
+# artifacts (~daily). Keeping the TTL short forces cold Postgres round
+# trips every ~5 minutes of idle, which surfaces as visible latency on
+# the first "Open Details" / "View History" click. 24h is comfortably
+# longer than the refresh cadence so steady-state traffic stays hot.
+_TTL_SECONDS = 24 * 60 * 60
 
 _cache: dict[tuple[str, str], tuple[float, bytes]] = {}
 
