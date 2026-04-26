@@ -14,7 +14,6 @@ import os
 import time
 
 import psycopg
-from psycopg import OperationalError
 
 # Sentinel plant_id for artifacts that aren't plant-scoped (e.g. EIA-860).
 GLOBAL_PLANT = "_global"
@@ -47,6 +46,15 @@ def fetch_artifact(plant_id: str, artifact_type: str) -> bytes:
     if cached and now - cached[0] < _TTL_SECONDS:
         return cached[1]
 
+    # Catch the full psycopg.Error hierarchy: OperationalError (network /
+    # auth / pool exhaustion) AND ProgrammingError (the table itself
+    # hasn't been created yet — happens on a fresh deploy before the ml
+    # refresher's first successful run, surfaces in pg logs as
+    # `relation "forecast_artifacts" does not exist`). Both mean "data
+    # not available" from the api's point of view, so we convert both to
+    # FileNotFoundError → 503 instead of letting them propagate as 500s
+    # (which Railway's gateway returns without CORS headers, surfacing
+    # in Safari as the opaque "Load failed").
     try:
         with _conn() as conn, conn.cursor() as cur:
             cur.execute(
@@ -55,9 +63,9 @@ def fetch_artifact(plant_id: str, artifact_type: str) -> bytes:
                 (plant_id, artifact_type),
             )
             row = cur.fetchone()
-    except OperationalError as exc:
+    except psycopg.Error as exc:
         raise FileNotFoundError(
-            f"postgres unreachable; cannot serve {artifact_type} for {plant_id}: {exc}"
+            f"postgres not ready; cannot serve {artifact_type} for {plant_id}: {exc}"
         ) from exc
 
     if row is None:

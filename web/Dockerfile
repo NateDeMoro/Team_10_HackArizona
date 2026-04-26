@@ -9,6 +9,14 @@ WORKDIR /app
 RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# NEXT_PUBLIC_* values are inlined into the client bundle at build
+# time. Railway exposes service env vars to a Dockerfile build only
+# when they are declared as ARG; we then hoist to ENV so `next build`
+# reads it. Without this, the fallback string in src/lib/api.ts ships
+# baked into the JS the browser executes (causing the History tab to
+# fetch from http://localhost:8000 in production).
+ARG NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm build
 
