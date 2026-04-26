@@ -134,7 +134,8 @@ export type DipCategory =
   | "operational"
   | "weather_dependent"
   | "non_weather_dependent"
-  | "refueling";
+  | "refueling"
+  | "post_refuel_recovery";
 
 export type HistoryPoint = {
   date: string;

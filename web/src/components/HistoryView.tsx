@@ -28,17 +28,19 @@ const Y_MAX = 102;
 const WATCH_PCT = 95;
 const ALERT_PCT = 90;
 
-const COLOR_LINE = "#0a0a0a";
-const COLOR_GREEN = "#16a34a";
+const COLOR_LINE = "#22c55e";
+const COLOR_GREEN = "#22c55e";
 const COLOR_YELLOW = "#ca8a04";
 const COLOR_RED = "#AB0520";
-const COLOR_NON_WEATHER = "#7c3aed";
+const COLOR_REFUEL = "#1d4ed8";
+const COLOR_NON_WEATHER = "#d946ef";
 
 const CATEGORY_LABEL: Record<DipCategory, string> = {
   operational: "Operational",
   weather_dependent: "Weather-driven dip",
   non_weather_dependent: "Non-weather dip",
   refueling: "Refueling outage",
+  post_refuel_recovery: "Post-refuel recovery",
 };
 
 type Row = HistoryPoint;
@@ -49,7 +51,8 @@ type Row = HistoryPoint;
 // (green/yellow/red) so an "operational ≥ 95" day reads green at a
 // glance.
 function dotColor(p: HistoryPoint): string {
-  if (p.dip_category === "refueling") return COLOR_RED;
+  if (p.dip_category === "refueling") return COLOR_REFUEL;
+  if (p.dip_category === "post_refuel_recovery") return COLOR_REFUEL;
   if (p.dip_category === "non_weather_dependent") return COLOR_NON_WEATHER;
   if (p.power_pct >= WATCH_PCT) return COLOR_GREEN;
   if (p.power_pct >= ALERT_PCT) return COLOR_YELLOW;
@@ -97,10 +100,12 @@ function renderTooltip({
 type DotProps = { cx?: number; cy?: number; payload?: HistoryPoint; index?: number };
 function ColoredDot({ cx, cy, payload, index }: DotProps) {
   if (cx == null || cy == null || !payload) return null;
-  // Skip dots for the two "dense" categories so the line speaks for them:
-  // green operational stretches and red refueling stretches. Keep dots only
-  // for the rare/interesting events (yellow watch, violet non-weather dip).
+  // Skip dots for the "dense" categories so the line speaks for them:
+  // green operational stretches and the blue refueling+recovery stretches.
+  // Keep dots only for the rare/interesting events (yellow watch, magenta
+  // non-weather dip).
   if (payload.dip_category === "refueling") return null;
+  if (payload.dip_category === "post_refuel_recovery") return null;
   if (
     payload.dip_category === "operational" &&
     payload.power_pct >= WATCH_PCT
@@ -154,22 +159,24 @@ export function HistoryView({ plantId, height = 300 }: Props) {
     return out;
   }, [today]);
 
-  // Split the line into two series so the refueling stretches render in red
-  // while the rest stays black. Each segment includes its boundary point
-  // (the immediately adjacent neighbor) so the two lines visually connect
-  // without a gap at the transition.
+  // Split the line into two series so the refueling + recovery stretches
+  // render in blue while the rest stays green. A day belongs to the blue
+  // series if it is an outage OR a post-refuel-recovery day; each segment
+  // also includes its boundary point (the immediately adjacent neighbor)
+  // so the two lines visually connect without a gap at the transition.
   const chartData = useMemo(() => {
     const pts = points ?? [];
+    const isBlue = (p?: HistoryPoint) =>
+      !!p && (p.is_outage || p.dip_category === "post_refuel_recovery");
     return pts.map((p, i) => {
       const prev = pts[i - 1];
       const next = pts[i + 1];
-      const refuelHere = p.is_outage;
-      const refuelAdj =
-        (prev?.is_outage ?? false) || (next?.is_outage ?? false);
+      const blueHere = isBlue(p);
+      const blueAdj = isBlue(prev) || isBlue(next);
       return {
         ...p,
-        value_main: refuelHere ? null : p.power_pct,
-        value_refuel: refuelHere || refuelAdj ? p.power_pct : null,
+        value_main: blueHere ? null : p.power_pct,
+        value_refuel: blueHere || blueAdj ? p.power_pct : null,
       };
     });
   }, [points]);
@@ -253,8 +260,8 @@ export function HistoryView({ plantId, height = 300 }: Props) {
                 type="linear"
                 dataKey="value_refuel"
                 name="Refueling"
-                stroke={COLOR_RED}
-                strokeWidth={1.5}
+                stroke={COLOR_REFUEL}
+                strokeWidth={3}
                 dot={false}
                 activeDot={{ r: 5 }}
                 isAnimationActive={false}
@@ -267,10 +274,11 @@ export function HistoryView({ plantId, height = 300 }: Props) {
       </div>
 
       <p className="text-xs text-[var(--ua-navy)]/60">
-        Operational days (≥ 95%) draw as the black trend line. Yellow dots
-        mark watch days (90–95%); violet dots mark non-weather-driven dips
+        Operational days (≥ 95%) draw as the green trend line. Yellow dots
+        mark watch days (90–95%); magenta dots mark non-weather-driven dips
         (model predicted ≥ 95% but realization fell below 90%). Refueling
-        outages pin to 0% and render as a red line segment.
+        outages and the reactor ramp-back that follows render as a bold
+        blue line until the plant returns to ≥ 95%.
       </p>
     </div>
   );
@@ -282,7 +290,7 @@ function Legend() {
       <span className="inline-flex items-center gap-1">
         <span
           className="inline-block h-0.5 w-4"
-          style={{ background: COLOR_LINE }}
+          style={{ background: COLOR_GREEN }}
         />
         Operational ≥ 95%
       </span>
@@ -302,10 +310,10 @@ function Legend() {
       </span>
       <span className="inline-flex items-center gap-1">
         <span
-          className="inline-block h-0.5 w-4"
-          style={{ background: COLOR_RED }}
+          className="inline-block h-1 w-4"
+          style={{ background: COLOR_REFUEL }}
         />
-        Refueling
+        Refueling + recovery
       </span>
     </div>
   );

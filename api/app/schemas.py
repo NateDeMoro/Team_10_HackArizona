@@ -481,6 +481,7 @@ DipCategory = Literal[
     "weather_dependent",
     "non_weather_dependent",
     "refueling",
+    "post_refuel_recovery",
 ]
 
 
@@ -512,8 +513,11 @@ class HistoryPoint(BaseModel):
         ...,
         description=(
             "operational / weather_dependent / non_weather_dependent / "
-            "refueling. non_weather_dependent flags days where the "
-            "model predicted no dip (>=95) but realization fell below 90."
+            "refueling / post_refuel_recovery. non_weather_dependent flags "
+            "days where the model predicted no dip (>=95) but realization "
+            "fell below 90. post_refuel_recovery flags sub-95 days between "
+            "the end of an outage and the first day the plant returns to "
+            ">=95, so reactor ramp-back doesn't read as a weather dip."
         ),
     )
 

@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Nuclear Energy Derating Forecaster — Technical Mini-Poster</title>
+<style>
+  :root {
+    --navy: #0c234b;
+    --navy-soft: #0c234b14;
+    --navy-line: #0c234b33;
+    --red: #ab0520;
+    --red-soft: #ab052012;
+    --ink: #0c234b;
+    --muted: #0c234bb3;
+    --bg: #ffffff;
+  }
+
+  @page {
+    size: letter portrait;
+    margin: 0.3in;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 9.5pt;
+    line-height: 1.32;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .page {
+    width: 7.9in;
+    margin: 0 auto;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 10.4in;
+  }
+
+  /* --- Banner header --- */
+  header.banner {
+    background: var(--navy);
+    color: #fff;
+    border-top: 7px solid var(--red);
+    border-bottom: 4px solid var(--red);
+    padding: 12px 16px 11px;
+    margin-bottom: 9px;
+  }
+  header.banner h1 {
+    font-size: 22pt;
+    margin: 0 0 2px;
+    letter-spacing: 0.3px;
+    font-weight: 700;
+  }
+  header.banner .sub {
+    font-size: 10pt;
+    opacity: 0.92;
+    margin: 0;
+    font-weight: 400;
+    line-height: 1.32;
+  }
+  header.banner .meta {
+    font-size: 8.5pt;
+    opacity: 0.78;
+    margin-top: 4px;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+  }
+
+  /* --- Section structure --- */
+  section { margin-bottom: 8px; }
+
+  h2.sect {
+    font-size: 10pt;
+    margin: 0 0 5px;
+    padding: 3px 8px;
+    background: var(--red);
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 700;
+    border-left: 5px solid var(--navy);
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 9px;
+  }
+
+  .card {
+    border: 1px solid var(--navy-line);
+    background: #fff;
+    padding: 9px 11px;
+  }
+  .card h3 {
+    font-size: 9.5pt;
+    margin: 0 0 4px;
+    color: var(--red);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  p { margin: 0 0 5px; }
+
+  ul.tight {
+    margin: 0;
+    padding-left: 16px;
+  }
+  ul.tight li { margin-bottom: 2px; }
+
+  .kv {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 2px 8px;
+    font-size: 9pt;
+  }
+  .kv dt {
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .kv dd { margin: 0; }
+
+  /* --- Results table --- */
+  table.results {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 7.7pt;
+    font-variant-numeric: tabular-nums;
+  }
+  table.results th, table.results td {
+    border: 1px solid var(--navy-line);
+    padding: 2px 5px;
+    text-align: right;
+  }
+  table.results th {
+    background: var(--navy);
+    color: #fff;
+    text-align: center;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    font-size: 7pt;
+  }
+  table.results td:first-child,
+  table.results th:first-child { text-align: left; }
+  table.results tr.win td.beat { color: var(--red); font-weight: 700; }
+  table.results tr:nth-child(even) td { background: #fafbfd; }
+
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 9px;
+    margin-bottom: 0;
+  }
+  .kpi-row.two { grid-template-columns: repeat(2, 1fr); }
+  .kpi {
+    border: 1px solid var(--navy-line);
+    border-top: 4px solid var(--red);
+    padding: 8px 12px 10px;
+    background: #fff;
+  }
+  .kpi .num {
+    font-size: 26pt;
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1;
+    margin: 2px 0 3px;
+    font-variant-numeric: tabular-nums;
+  }
+  .kpi .lbl {
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .kpi .sub {
+    font-size: 8.5pt;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+
+  /* --- Pipeline flow --- */
+  .flow {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+    align-items: stretch;
+  }
+  .flow .step {
+    background: #fff;
+    border: 1px solid var(--navy-line);
+    padding: 8px 8px;
+    position: relative;
+    text-align: center;
+  }
+  .flow .step + .step { border-left: 0; }
+  .flow .step::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: -6px;
+    width: 0;
+    height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-left: 7px solid var(--red);
+    transform: translateY(-50%);
+    z-index: 2;
+    background: transparent;
+  }
+  .flow .step:last-child::after { display: none; }
+  .flow .step .label {
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--red);
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .flow .step .body {
+    font-size: 8.5pt;
+    color: var(--ink);
+    line-height: 1.28;
+  }
+
+  /* --- Tag pills --- */
+  .pills { line-height: 1.85; }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border: 1px solid var(--navy-line);
+    background: var(--navy-soft);
+    color: var(--navy);
+    font-size: 8.5pt;
+    border-radius: 10px;
+    margin: 0 3px 3px 0;
+    white-space: nowrap;
+  }
+  .pill.red {
+    background: var(--red-soft);
+    border-color: var(--red);
+    color: var(--red);
+  }
+
+  footer.foot {
+    border-top: 2px solid var(--red);
+    margin-top: auto;
+    padding-top: 5px;
+    font-size: 8pt;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .nowrap { white-space: nowrap; }
+  .small  { font-size: 8.5pt; color: var(--muted); }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- BANNER -->
+  <header class="banner">
+    <h1>Nuclear Energy Derating Forecaster</h1>
+    <p class="sub">A 14-day, weather-driven capacity-factor forecast for U.S. nuclear units, with calibrated uncertainty bands and an LLM-generated operator briefing.</p>
+    <p class="meta">HackArizona · Team 10</p>
+  </header>
+
+  <!-- PROBLEM + APPROACH -->
+  <section>
+    <div class="grid-2">
+      <div class="card">
+        <h3>The Problem</h3>
+        <p>During heatwaves and low-flow conditions, once-through-cooled reactors are forced to <b>derate</b> — running below 100% nameplate to stay within thermal-discharge limits. Grid operators get little advance notice; current public reporting is same-day or after-the-fact.</p>
+      </div>
+      <div class="card">
+        <h3>Our Approach</h3>
+        <p>One XGBoost model per forecast horizon (1–14 days), trained only on day-of weather and water features. A symmetric residual band gives calibrated uncertainty; AWS Bedrock + Gemma 3 27B turns the numeric output into a plain-English briefing for non-experts.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- HEADLINE KPIs -->
+  <section>
+    <h2 class="sect">Headline Results — held-out test (2023+)</h2>
+    <div class="kpi-row two">
+      <div class="kpi">
+        <div class="lbl">Beats persistence</div>
+        <div class="num">14 / 14</div>
+        <div class="sub">horizons, on dip-event MAE</div>
+      </div>
+      <div class="kpi">
+        <div class="lbl">Beats climatology</div>
+        <div class="num">11 / 14</div>
+        <div class="sub">horizons, on dip-event MAE</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DATASETS + TECH STACK + MODEL -->
+  <section>
+    <div class="grid-3">
+
+      <!-- Datasets -->
+      <div class="card">
+        <h3>Datasets</h3>
+        <ul class="tight">
+          <li><b>NRC</b> Daily Power Status — capacity-factor labels, 2005–present</li>
+          <li><b>Open-Meteo</b> ERA5 archive + historical-forecast + live (8 hourly vars: temp, dew point, humidity, wind, shortwave, precip, surface pressure, cloud cover)</li>
+          <li><b>USGS NWIS</b> daily values — water temp (00010) &amp; discharge (00060)</li>
+          <li><b>EIA-860</b> annual release — plant catalog, nameplate, lat/lon</li>
+        </ul>
+        <p class="small" style="margin-top:3px"><b>~7,300</b> training rows per plant after outage / pre-outage filtering. Test split: <b>1,026</b> days, <b>~22</b> dip events per horizon.</p>
+      </div>
+
+      <!-- Model Architecture -->
+      <div class="card">
+        <h3>Model Architecture</h3>
+        <dl class="kv">
+          <dt>Algorithm</dt><dd>14× XGBoost regressors (one per horizon)</dd>
+          <dt>Hyperparams</dt><dd>depth 6 · lr 0.05 · 1500 rounds · ES 50 · subsample 0.8</dd>
+          <dt>Loss</dt><dd>squared-error w/ dip-weighted samples (α = 0.5)</dd>
+          <dt>Calibration</dt><dd>Isotonic, gated on raw ≥ 95% (preserves dip recall)</dd>
+          <dt>Band</dt><dd>Symmetric residual: point ± δ<sub>h</sub>, δ from 80th-pct |val residuals|</dd>
+          <dt>Attribution</dt><dd>Tree-SHAP via <code>pred_contribs=True</code> — exact, per-horizon</dd>
+          <dt>Splits</dt><dd>train ≤ 2019 · val 2020–2022 · test 2023+</dd>
+        </dl>
+      </div>
+
+      <!-- Features -->
+      <div class="card">
+        <h3>Feature Engineering</h3>
+        <ul class="tight">
+          <li><b>Lags</b>: 1, 3, 7, 14 d (matches inference horizons)</li>
+          <li><b>Rolling</b>: 7, 14, 30 d means &amp; maxes (<code>closed='left'</code> — no same-day leakage)</li>
+          <li><b>Heat dose</b>: Σ max(0, T<sub>max</sub> − 25 °C) over 7 / 14 d — proxy for thermal-limit pressure</li>
+          <li><b>Categorical</b>: USGS site id (handles multi-gauge plants natively)</li>
+          <li>Outage / pre-outage rows filtered from training; surfaced separately at inference.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- PIPELINE FLOW -->
+  <section>
+    <h2 class="sect">System Architecture — Daily Refresh Pipeline</h2>
+    <div class="flow">
+      <div class="step">
+        <div class="label">1 · Ingest</div>
+        <div class="body">NRC · Open-Meteo · USGS · EIA-860<br><span class="small">Cron, daily</span></div>
+      </div>
+      <div class="step">
+        <div class="label">2 · Features</div>
+        <div class="body">Lags · rolling · heat-dose<br>build_dataset.parquet</div>
+      </div>
+      <div class="step">
+        <div class="label">3 · Inference</div>
+        <div class="body">14 XGBoost models<br>+ isotonic calibration</div>
+      </div>
+      <div class="step">
+        <div class="label">4 · Briefing</div>
+        <div class="body">AWS Bedrock<br>Gemma 3 27B</div>
+      </div>
+      <div class="step">
+        <div class="label">5 · Serve</div>
+        <div class="body">Postgres → FastAPI<br>→ Next.js UI</div>
+      </div>
+    </div>
+    <p class="small" style="margin-top:3px">All artifacts (forecast, attributions, backtest, briefing) are precomputed daily on Railway and uploaded to a single <code>forecast_artifacts</code> Postgres table. The API ships no data — it streams cached bytes with a 5-min TTL and a 60s refresh watcher.</p>
+  </section>
+
+  <!-- TECH STACK -->
+  <section>
+    <h2 class="sect">Tech Stack</h2>
+    <div class="grid-3">
+      <div class="card">
+        <h3>ML</h3>
+        <div class="pills">
+          <span class="pill red">Python 3.12</span>
+          <span class="pill red">XGBoost</span>
+          <span class="pill">scikit-learn (Isotonic)</span>
+          <span class="pill">pandas</span>
+          <span class="pill">numpy</span>
+          <span class="pill">Pydantic v2</span>
+          <span class="pill">Tree-SHAP</span>
+          <span class="pill">uv</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>API · Backend</h3>
+        <div class="pills">
+          <span class="pill red">FastAPI</span>
+          <span class="pill red">PostgreSQL</span>
+          <span class="pill">psycopg 3</span>
+          <span class="pill">uvicorn</span>
+          <span class="pill">boto3 (Bedrock)</span>
+          <span class="pill">Gemma 3 27B</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Web · Infra</h3>
+        <div class="pills">
+          <span class="pill red">Next.js 15</span>
+          <span class="pill red">TypeScript</span>
+          <span class="pill">React (Server Components)</span>
+          <span class="pill">Recharts</span>
+          <span class="pill">Leaflet</span>
+          <span class="pill">Tailwind CSS</span>
+          <span class="pill">Railway</span>
+          <span class="pill">just</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span><b>Team 10 · HackArizona 2026</b> · Nuclear Energy Derating Forecaster</span>
+    <span>Backtest split: 2023-01-01 → present · 2 plants modeled · 28 trained boosters</span>
+  </footer>
+
+</div>
+</body>
+</html>

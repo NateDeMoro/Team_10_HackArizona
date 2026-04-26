@@ -148,6 +148,9 @@ def load_history_year(slug: str, year: int) -> list[dict]:
     so the chart can render an explicit "Refueling" red floor instead of
     a gap. Dip category combines actual + prediction:
       - refueling: is_outage row
+      - post_refuel_recovery: sub-95 day after exiting an outage, before
+        the plant first reaches >=95 again — reactor ramp-back, not a
+        weather-driven dip
       - non_weather_dependent: power < 90 and prediction >= 95 (model
         saw no weather signal but reality dipped)
       - weather_dependent: any other sub-95 day, including pre-2023
@@ -157,7 +160,27 @@ def load_history_year(slug: str, year: int) -> list[dict]:
     _ensure_supported(slug)
     df = _fetch_parquet(slug, "labels")
     df["date"] = pd.to_datetime(df["date"]).dt.date
-    df = df[df["date"].apply(lambda d: d.year == year)].sort_values("date")
+    df = df.sort_values("date")
+
+    # Seed in_recovery from prior history: if the plant exited an outage in
+    # the previous year and hadn't yet ramped back to >=95% by Jan 1, the
+    # opening days of `year` are still recovery days, not weather dips.
+    prior = df[df["date"].apply(lambda d: d.year < year)]
+    seed_in_recovery = False
+    for r in prior.to_dict(orient="records"):
+        if bool(r.get("is_outage")) or bool(r.get("is_pre_outage")):
+            seed_in_recovery = True
+        else:
+            raw = r.get("power_pct")
+            val = (
+                float(raw)
+                if raw is not None and not pd.isna(raw)
+                else 0.0
+            )
+            if val >= 95:
+                seed_in_recovery = False
+
+    df = df[df["date"].apply(lambda d: d.year == year)]
 
     pred_by_date: dict[date, float] = {}
     try:
@@ -173,6 +196,7 @@ def load_history_year(slug: str, year: int) -> list[dict]:
         pass
 
     rows: list[dict] = []
+    in_recovery = seed_in_recovery
     for r in df.to_dict(orient="records"):
         is_outage = bool(r.get("is_outage")) or bool(r.get("is_pre_outage"))
         raw_power = r.get("power_pct")
@@ -180,6 +204,7 @@ def load_history_year(slug: str, year: int) -> list[dict]:
         if is_outage:
             power_pct = 0.0
             category = "refueling"
+            in_recovery = True
         else:
             power_pct = (
                 float(raw_power)
@@ -188,6 +213,9 @@ def load_history_year(slug: str, year: int) -> list[dict]:
             )
             if power_pct >= 95:
                 category = "operational"
+                in_recovery = False
+            elif in_recovery:
+                category = "post_refuel_recovery"
             elif power_pct < 90 and prediction is not None and prediction >= 95:
                 category = "non_weather_dependent"
             else:
