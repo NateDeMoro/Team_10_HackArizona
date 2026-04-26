@@ -330,3 +330,126 @@ class BacktestResponse(BaseModel):
     as_of: date
     source: ForecastSource
     rows: list[BacktestRow]
+
+
+class Plant(BaseModel):
+    """Catalog entry for one nuclear plant on the UI map.
+
+    `modeled=True` means the v1 forecast pipeline serves real predictions
+    for this plant. `modeled=False` plants are placeholder pins from
+    EIA-860 used to communicate "scaling is the next step" — clicking
+    them in the UI should surface a "model coming soon" affordance.
+    """
+
+    id: str
+    display_name: str
+    operator: str | None = None
+    river: str | None = None
+    lat: float
+    lon: float
+    state: str | None = None
+    plant_code: int | None = Field(
+        None,
+        description="EIA-860 plant_code; null for hand-curated entries.",
+    )
+    nameplate_mw: float | None = None
+    modeled: bool
+
+
+class ActualPoint(BaseModel):
+    """One realized day of capacity factor for the historical-actuals chart."""
+
+    date: date
+    power_pct: float | None = Field(
+        None,
+        description=(
+            "Realized capacity factor (0-100). Null when the unit is in a "
+            "refueling outage or pre-outage coastdown — those days are "
+            "filtered so the chart shows weather-driven dynamics only."
+        ),
+    )
+    is_outage: bool
+
+
+class ActualsResponse(BaseModel):
+    """Trailing window of realized actuals for the forecast chart."""
+
+    plant_id: str
+    days: int
+    points: list[ActualPoint]
+
+
+class WeatherInputPoint(BaseModel):
+    """One day's weather/water inputs for the sparkline panel."""
+
+    date: date
+    air_temp_c_max: float | None = None
+    water_temp_c: float | None = None
+    streamflow_cfs: float | None = None
+
+
+class InputsResponse(BaseModel):
+    """Recent weather and water inputs feeding the model."""
+
+    plant_id: str
+    points: list[WeatherInputPoint]
+
+
+class FeatureContribution(BaseModel):
+    """Per-feature SHAP contribution for one horizon's prediction."""
+
+    feature: str
+    value: float | None = Field(
+        None,
+        description=(
+            "Raw feature value at run_date. Null for categorical or "
+            "missing values (XGBoost handles missingness natively)."
+        ),
+    )
+    contribution_pct: float = Field(
+        ...,
+        description=(
+            "Signed SHAP value in capacity-factor percentage points. "
+            "Sums (with baseline_pct) to point_pct exactly."
+        ),
+    )
+
+
+class HorizonAttribution(BaseModel):
+    """Top-N feature attributions for one forecast horizon."""
+
+    horizon_days: int = Field(..., ge=1, le=14)
+    baseline_pct: float = Field(
+        ...,
+        description="Booster bias term — the model's mean prediction.",
+    )
+    point_pct: float
+    top_features: list[FeatureContribution]
+
+
+class AttributionsResponse(BaseModel):
+    """SHAP attributions for the latest precomputed forecast.
+
+    One entry per horizon (1..14). The UI defaults to showing
+    horizon_days == 7 (the headline forecast), but all horizons are
+    served so a future drill-down can switch horizons without a
+    second request.
+    """
+
+    plant_id: str
+    run_date: date
+    horizons: list[HorizonAttribution]
+
+
+class BacktestDatesResponse(BaseModel):
+    """Valid as_of values for the replay slider.
+
+    `dates` is the full sorted set of run_dates the backtest parquet
+    covers (~1000 days on the 2023+ test split). `highlights` is the
+    subset called out in the report — historical dates with documented
+    heatwave context. The UI can render these as labeled tick marks.
+    """
+
+    plant_id: str
+    dates: list[date]
+    highlights: list[date]

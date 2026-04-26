@@ -11,10 +11,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-# Canonical NRC unit name for Quad Cities Unit 1. NRC files use this exact
-# string from 2005-onward; matching is performed case-insensitively at parse
-# time so minor whitespace drift in older files cannot break ingestion.
-CANONICAL_UNIT_QC1 = "Quad Cities 1"
+# Per-plant constants (NRC unit name, lat/lon, USGS gauges) live in
+# ``ml/plants.py`` — keyed by slug. This module holds only generic
+# constants shared across plants (model hyperparameters, train splits,
+# Open-Meteo URLs, NRC parser knobs, API contract).
 
 # Earliest year the NRC publishes daily power-status files at the canonical
 # URL. 1999 was specified in the plan; in practice files only exist from 2005.
@@ -55,12 +55,6 @@ PRE_OUTAGE_MIN_BUFFER_DAYS = 14
 
 # --- Tier 2: features ----------------------------------------------------
 
-# Quad Cities Generating Station (Cordova, IL). Single-point pull at the
-# reactor footprint; the river is co-located so air-temp drift between intake
-# and reactor is negligible (flagged in Project_Plan.md as a known v1 caveat).
-QC1_LAT = 41.7261
-QC1_LON = -90.3097
-
 # Open-Meteo customer endpoints. The paid plan authenticates via a lowercase
 # `apikey` query parameter on every request.
 OPENMETEO_ARCHIVE_URL = "https://customer-archive-api.open-meteo.com/v1/archive"
@@ -87,12 +81,9 @@ WEATHER_HOURLY_VARS = (
 # avoids requesting nulls on every fresh ingest.
 WEATHER_ARCHIVE_END_LAG_DAYS = 7
 
-# USGS NWIS daily values. 05420500 (Mississippi at Clinton, IA) is the long
-# record; in 2021 USGS moved the temp sensor downstream to 05420400 which
-# became the active gauge. Plan recommendation: treat as one continuous
-# series, splice at the date 05420400 first reports, log overlap correlation.
-USGS_SITE_PRIMARY = "05420500"   # 1999 - 2021ish
-USGS_SITE_SECONDARY = "05420400"  # 2021 - present
+# USGS NWIS daily values. Per-gauge site numbers live in the plant
+# registry (``ml/plants.py``) since they vary per plant; only the
+# parameter codes and base URL are generic.
 USGS_PARAM_TEMP = "00010"        # water temperature, deg C
 USGS_PARAM_FLOW = "00060"        # discharge, cubic feet/sec
 USGS_DV_URL = "https://waterservices.usgs.gov/nwis/dv/"
@@ -157,9 +148,10 @@ NON_FEATURE_COLS = (
     "is_pre_outage",
 )
 
-# Categorical features for XGBoost (enable_categorical=True). Only
-# water_site_id today; the model can learn the ~0.75 deg C systematic
-# offset between USGS gauges 05420500 and 05420400.
+# Categorical features for XGBoost (enable_categorical=True).
+# water_site_id is informative when a plant stitches multiple USGS gauges
+# (e.g., Quad Cities). For single-gauge plants the column is a constant
+# and XGBoost ignores it during fitting.
 CATEGORICAL_FEATURES = ("water_site_id",)
 
 # XGBoost hyperparameters. Modest depth + many rounds + early stopping on
@@ -330,3 +322,126 @@ class BacktestResponse(BaseModel):
     as_of: date
     source: ForecastSource
     rows: list[BacktestRow]
+
+
+class Plant(BaseModel):
+    """Catalog entry for one nuclear plant on the UI map.
+
+    `modeled=True` means the v1 forecast pipeline serves real predictions
+    for this plant. `modeled=False` plants are placeholder pins from
+    EIA-860 used to communicate "scaling is the next step" — clicking
+    them in the UI should surface a "model coming soon" affordance.
+    """
+
+    id: str
+    display_name: str
+    operator: str | None = None
+    river: str | None = None
+    lat: float
+    lon: float
+    state: str | None = None
+    plant_code: int | None = Field(
+        None,
+        description="EIA-860 plant_code; null for hand-curated entries.",
+    )
+    nameplate_mw: float | None = None
+    modeled: bool
+
+
+class ActualPoint(BaseModel):
+    """One realized day of capacity factor for the historical-actuals chart."""
+
+    date: date
+    power_pct: float | None = Field(
+        None,
+        description=(
+            "Realized capacity factor (0-100). Null when the unit is in a "
+            "refueling outage or pre-outage coastdown — those days are "
+            "filtered so the chart shows weather-driven dynamics only."
+        ),
+    )
+    is_outage: bool
+
+
+class ActualsResponse(BaseModel):
+    """Trailing window of realized actuals for the forecast chart."""
+
+    plant_id: str
+    days: int
+    points: list[ActualPoint]
+
+
+class WeatherInputPoint(BaseModel):
+    """One day's weather/water inputs for the sparkline panel."""
+
+    date: date
+    air_temp_c_max: float | None = None
+    water_temp_c: float | None = None
+    streamflow_cfs: float | None = None
+
+
+class InputsResponse(BaseModel):
+    """Recent weather and water inputs feeding the model."""
+
+    plant_id: str
+    points: list[WeatherInputPoint]
+
+
+class FeatureContribution(BaseModel):
+    """Per-feature SHAP contribution for one horizon's prediction."""
+
+    feature: str
+    value: float | None = Field(
+        None,
+        description=(
+            "Raw feature value at run_date. Null for categorical or "
+            "missing values (XGBoost handles missingness natively)."
+        ),
+    )
+    contribution_pct: float = Field(
+        ...,
+        description=(
+            "Signed SHAP value in capacity-factor percentage points. "
+            "Sums (with baseline_pct) to point_pct exactly."
+        ),
+    )
+
+
+class HorizonAttribution(BaseModel):
+    """Top-N feature attributions for one forecast horizon."""
+
+    horizon_days: int = Field(..., ge=1, le=14)
+    baseline_pct: float = Field(
+        ...,
+        description="Booster bias term — the model's mean prediction.",
+    )
+    point_pct: float
+    top_features: list[FeatureContribution]
+
+
+class AttributionsResponse(BaseModel):
+    """SHAP attributions for the latest precomputed forecast.
+
+    One entry per horizon (1..14). The UI defaults to showing
+    horizon_days == 7 (the headline forecast), but all horizons are
+    served so a future drill-down can switch horizons without a
+    second request.
+    """
+
+    plant_id: str
+    run_date: date
+    horizons: list[HorizonAttribution]
+
+
+class BacktestDatesResponse(BaseModel):
+    """Valid as_of values for the replay slider.
+
+    `dates` is the full sorted set of run_dates the backtest parquet
+    covers (~1000 days on the 2023+ test split). `highlights` is the
+    subset called out in the report — historical dates with documented
+    heatwave context. The UI can render these as labeled tick marks.
+    """
+
+    plant_id: str
+    dates: list[date]
+    highlights: list[date]

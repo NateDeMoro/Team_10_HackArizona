@@ -29,7 +29,8 @@ Reads:
     data/artifacts/band_deltas.json
     data/artifacts/model_h{H}_point.json
 Writes (when invoked from CLI):
-    data/artifacts/forecast_latest.json     (precomputed response for the API)
+    data/artifacts/forecast_latest.json       (precomputed response for the API)
+    data/artifacts/attributions_latest.json   (per-horizon SHAP top features)
 """
 from __future__ import annotations
 
@@ -45,18 +46,26 @@ import pandas as pd
 import xgboost as xgb
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from plants import get_plant  # noqa: E402
 from schemas import (  # noqa: E402
-    CANONICAL_UNIT_QC1,
     CATEGORICAL_FEATURES,
     DIP_THRESHOLD_PCT,
     AlertLevel,
+    AttributionsResponse,
+    FeatureContribution,
     ForecastResponse,
     ForecastSource,
     HISTORICAL_NWP_MIN_DATE,
     HORIZONS,
+    HorizonAttribution,
     HorizonPrediction,
     UI_ALERT_THRESHOLD_PCT,
 )
+
+# Number of top SHAP-contribution features surfaced per horizon. The UI
+# renders the top 5 by default but we serialize 10 so a future drill-down
+# can show more without a fresh `just forecast` run.
+ATTRIBUTION_TOP_N = 10
 
 log = logging.getLogger(__name__)
 
@@ -64,16 +73,20 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PROCESSED_DIR = REPO_ROOT / "data" / "processed"
 ARTIFACTS_DIR = REPO_ROOT / "data" / "artifacts"
 
-# Single-plant v1; the API serializes plant_id as a string so the UI can
-# scale later without a model-side enum migration.
+# v1 inference is single-plant: the live JSON the API serves comes from
+# this slug. Multi-plant API integration is a separate task; the training
+# pipeline already supports any registered plant slug.
 PLANT_QC1 = "quad_cities_1"
+_PLANT = get_plant(PLANT_QC1)
+_PLANT_PROCESSED_DIR = PROCESSED_DIR / _PLANT.slug
+_PLANT_ARTIFACTS_DIR = ARTIFACTS_DIR / _PLANT.slug
 
 
 def _load_features() -> pd.DataFrame:
-    src = PROCESSED_DIR / "training_dataset.parquet"
+    src = _PLANT_PROCESSED_DIR / "training_dataset.parquet"
     if not src.exists():
         raise FileNotFoundError(
-            f"missing {src}; run `just features` to refresh the cache"
+            f"missing {src}; run `just features {PLANT_QC1}` to refresh the cache"
         )
     df = pd.read_parquet(src)
     df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None).dt.normalize()
@@ -84,12 +97,12 @@ def _load_features() -> pd.DataFrame:
 
 
 def _load_feature_columns() -> list[str]:
-    p = ARTIFACTS_DIR / "feature_columns.json"
+    p = _PLANT_ARTIFACTS_DIR / "feature_columns.json"
     return json.loads(p.read_text())
 
 
 def _load_band_deltas() -> dict[str, dict[str, float]]:
-    p = ARTIFACTS_DIR / "band_deltas.json"
+    p = _PLANT_ARTIFACTS_DIR / "band_deltas.json"
     return json.loads(p.read_text())
 
 
@@ -157,10 +170,10 @@ def forecast(plant_id: str, run_date: date) -> ForecastResponse:
 
     horizons: list[HorizonPrediction] = []
     for h in HORIZONS:
-        point_path = ARTIFACTS_DIR / f"model_h{h:02d}_point.json"
+        point_path = _PLANT_ARTIFACTS_DIR / f"model_h{h:02d}_point.json"
         if not point_path.exists():
             raise FileNotFoundError(
-                f"missing model artifact for h={h}; run `just train` first"
+                f"missing model artifact for h={h}; run `just train {PLANT_QC1}` first"
             )
         point_model = _load_booster(point_path)
         point_pred = float(point_model.predict(X_run)[0])
@@ -191,6 +204,92 @@ def forecast(plant_id: str, run_date: date) -> ForecastResponse:
         plant_id=plant_id,
         run_date=run_date,
         source=_classify_source(run_date),
+        horizons=horizons,
+    )
+
+
+def attributions(plant_id: str, run_date: date) -> AttributionsResponse:
+    """Per-horizon SHAP attributions for the run_date feature row.
+
+    Uses XGBoost's built-in tree SHAP via `pred_contribs=True` — exact
+    decomposition, no external `shap` dependency. Each horizon model is
+    decomposed separately because they were trained on the same feature
+    matrix but learn different (target -> feature) relationships.
+
+    Returns the top-N features by absolute contribution per horizon, in
+    capacity-factor percentage points. baseline + sum(all contributions)
+    equals the unclamped point prediction; the top-N subset is what the
+    UI renders, so the running sum may not exactly match point_pct.
+    """
+    if plant_id != PLANT_QC1:
+        raise ValueError(f"only {PLANT_QC1!r} is supported in v1; got {plant_id!r}")
+
+    feat_cols = _load_feature_columns()
+    df = _load_features()
+
+    run_ts = pd.Timestamp(run_date)
+    row_mask = df["date"] == run_ts
+    if not row_mask.any():
+        avail_max = df["date"].max().date()
+        raise LookupError(
+            f"no feature row for run_date={run_date}; cache covers up to "
+            f"{avail_max}. Run `just features` to refresh."
+        )
+
+    X_run = df.loc[row_mask, feat_cols].iloc[[0]].copy()
+    # Capture raw values for surfacing alongside contributions. Categorical
+    # features serialize as None — the UI does not need to render their
+    # internal codes.
+    raw_values: dict[str, float | None] = {}
+    for col in feat_cols:
+        v = X_run[col].iloc[0]
+        if pd.isna(v) or X_run[col].dtype.name == "category":
+            raw_values[col] = None
+        else:
+            raw_values[col] = float(v)
+
+    horizons: list[HorizonAttribution] = []
+    dmat = xgb.DMatrix(X_run, enable_categorical=True)
+    for h in HORIZONS:
+        point_path = _PLANT_ARTIFACTS_DIR / f"model_h{h:02d}_point.json"
+        if not point_path.exists():
+            raise FileNotFoundError(
+                f"missing model artifact for h={h}; run `just train {PLANT_QC1}` first"
+            )
+        booster = _load_booster(point_path).get_booster()
+        # contribs shape: (1, n_features + 1); last column is the bias.
+        contribs = booster.predict(dmat, pred_contribs=True)[0]
+        baseline = float(contribs[-1])
+        feat_contribs = contribs[:-1]
+        # Rank features by absolute contribution; emit signed value so the
+        # UI can color positive (push up) vs negative (push down) bars.
+        order = np.argsort(np.abs(feat_contribs))[::-1][:ATTRIBUTION_TOP_N]
+        top: list[FeatureContribution] = []
+        for idx in order:
+            name = feat_cols[idx]
+            top.append(
+                FeatureContribution(
+                    feature=name,
+                    value=raw_values.get(name),
+                    contribution_pct=float(feat_contribs[idx]),
+                )
+            )
+        # Reconstruct the unclamped point prediction so the UI can show
+        # baseline -> point delta and warn if the top-N covers a small
+        # share of the total movement.
+        point_unclamped = float(baseline + feat_contribs.sum())
+        horizons.append(
+            HorizonAttribution(
+                horizon_days=h,
+                baseline_pct=baseline,
+                point_pct=point_unclamped,
+                top_features=top,
+            )
+        )
+
+    return AttributionsResponse(
+        plant_id=plant_id,
+        run_date=run_date,
         horizons=horizons,
     )
 
@@ -234,9 +333,14 @@ def run() -> None:
         )
 
     resp = forecast(PLANT_QC1, run_date)
-    out = ARTIFACTS_DIR / "forecast_latest.json"
+    out = _PLANT_ARTIFACTS_DIR / "forecast_latest.json"
     out.write_text(resp.model_dump_json(indent=2))
     log.info("wrote %s (run_date=%s, source=%s)", out, run_date, resp.source)
+
+    attr = attributions(PLANT_QC1, run_date)
+    attr_out = _PLANT_ARTIFACTS_DIR / "attributions_latest.json"
+    attr_out.write_text(attr.model_dump_json(indent=2))
+    log.info("wrote %s (run_date=%s)", attr_out, run_date)
 
 
 def _main() -> None:
@@ -250,5 +354,4 @@ def _main() -> None:
 
 
 if __name__ == "__main__":
-    _ = CANONICAL_UNIT_QC1  # touch import so unused-import linters stay quiet
     _main()

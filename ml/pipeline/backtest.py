@@ -56,6 +56,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PROCESSED_DIR = REPO_ROOT / "data" / "processed"
 ARTIFACTS_DIR = REPO_ROOT / "data" / "artifacts"
 
+# v1 backtest is single-plant (matches inference). Multi-plant backtest
+# is a separate task; the pipeline already trains arbitrary plants.
+_PLANT_SLUG = inference.PLANT_QC1
+_PLANT_PROCESSED_DIR = PROCESSED_DIR / _PLANT_SLUG
+_PLANT_ARTIFACTS_DIR = ARTIFACTS_DIR / _PLANT_SLUG
+
 
 def _feature_cols(df: pd.DataFrame) -> list[str]:
     return [c for c in df.columns if c not in NON_FEATURE_COLS]
@@ -136,9 +142,9 @@ def _detection_metrics(
 
 
 def run() -> None:
-    src = PROCESSED_DIR / "training_dataset.parquet"
+    src = _PLANT_PROCESSED_DIR / "training_dataset.parquet"
     if not src.exists():
-        raise FileNotFoundError(f"missing {src}; run `just features` first")
+        raise FileNotFoundError(f"missing {src}; run `just features {_PLANT_SLUG}` first")
     raw = pd.read_parquet(src)
     raw["date"] = pd.to_datetime(raw["date"]).dt.tz_localize(None).dt.normalize()
     raw = _coerce_categoricals(raw)
@@ -160,7 +166,7 @@ def run() -> None:
         y_test = test["target"].to_numpy(dtype=float)
         target_dates = pd.to_datetime(test["date"]) + pd.Timedelta(days=h)
 
-        point = _load_booster(ARTIFACTS_DIR / f"model_h{h:02d}_point.json")
+        point = _load_booster(_PLANT_ARTIFACTS_DIR / f"model_h{h:02d}_point.json")
         point_pred = point.predict(X_test)
         delta_h = float(deltas[f"h{h:02d}"]["delta_pct"])
         band_low_pred = np.clip(point_pred - delta_h, 0.0, 100.0)
@@ -237,7 +243,7 @@ def run() -> None:
 
     # Write per-row predictions for the UI/replay layer.
     results_df = pd.DataFrame(rows)
-    results_path = ARTIFACTS_DIR / "backtest_results.parquet"
+    results_path = _PLANT_ARTIFACTS_DIR / "backtest_results.parquet"
     results_df.to_parquet(results_path, index=False)
     log.info("wrote %s (%d rows)", results_path, len(results_df))
 
@@ -249,12 +255,12 @@ def run() -> None:
 
     # Write the human-readable report.
     report = _format_report(horizon_blocks, highlights)
-    report_path = ARTIFACTS_DIR / "backtest_report.md"
+    report_path = _PLANT_ARTIFACTS_DIR / "backtest_report.md"
     report_path.write_text(report)
     log.info("wrote %s", report_path)
 
     # Also stash the structured block alongside metrics.json for tooling.
-    backtest_json_path = ARTIFACTS_DIR / "backtest_metrics.json"
+    backtest_json_path = _PLANT_ARTIFACTS_DIR / "backtest_metrics.json"
     backtest_json_path.write_text(
         json.dumps(
             {"horizons": horizon_blocks, "historical_highlights": highlights},

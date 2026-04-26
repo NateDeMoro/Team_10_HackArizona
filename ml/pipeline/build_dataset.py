@@ -1,16 +1,17 @@
 """Join features onto labels into the final training Parquet (Tier 2).
 
-Use when: producing the canonical training table the model trains on.
-Left-joins the engineered features onto the full QC1 label timeseries
-(including is_outage and is_pre_outage flags), preserving every label day.
-Filtering decisions for outage / pre-outage days are deferred to Tier 3.
-Run via `just features` or `uv run python -m pipeline.build_dataset`.
+Use when: producing the canonical training table the model trains on for
+a given plant. Left-joins the engineered features onto the full label
+timeseries (including is_outage and is_pre_outage flags), preserving
+every label day. Filtering decisions for outage / pre-outage days are
+deferred to Tier 3. Run via ``just features <slug>`` or
+``uv run python -m pipeline.build_dataset --plant <slug>``.
 
 Reads:
-    data/interim/labels_quad_cities_1.parquet
-    data/interim/features_quad_cities.parquet
+    data/interim/labels_<slug>.parquet
+    data/interim/features_<slug>.parquet
 Writes:
-    data/processed/training_dataset.parquet
+    data/processed/<slug>/training_dataset.parquet
 """
 from __future__ import annotations
 
@@ -22,7 +23,7 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from schemas import CANONICAL_UNIT_QC1  # noqa: E402
+from plants import PLANTS, Plant, get_plant  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -59,11 +60,12 @@ def _coverage_report(df: pd.DataFrame) -> None:
         log.info("  %d: %s", y, parts)
 
 
-def run() -> None:
-    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+def run(plant: Plant) -> None:
+    plant_processed_dir = PROCESSED_DIR / plant.slug
+    plant_processed_dir.mkdir(parents=True, exist_ok=True)
 
-    labels_path = INTERIM_DIR / "labels_quad_cities_1.parquet"
-    features_path = INTERIM_DIR / "features_quad_cities.parquet"
+    labels_path = INTERIM_DIR / f"labels_{plant.slug}.parquet"
+    features_path = INTERIM_DIR / f"features_{plant.slug}.parquet"
     if not labels_path.exists():
         raise FileNotFoundError(f"missing {labels_path}; run ingest_nrc first")
     if not features_path.exists():
@@ -78,9 +80,9 @@ def run() -> None:
     if labels["date"].dt.tz is not None or features["date"].dt.tz is not None:
         raise RuntimeError("date columns must be tz-naive after normalization")
 
-    if labels["unit"].nunique() != 1 or labels["unit"].iloc[0] != CANONICAL_UNIT_QC1:
+    if labels["unit"].nunique() != 1 or labels["unit"].iloc[0] != plant.nrc_unit_name:
         raise RuntimeError(
-            f"labels file must contain exactly {CANONICAL_UNIT_QC1!r} rows"
+            f"labels file must contain exactly {plant.nrc_unit_name!r} rows"
         )
 
     df = labels.merge(features, on="date", how="left").sort_values("date").reset_index(drop=True)
@@ -88,7 +90,7 @@ def run() -> None:
     if df["date"].duplicated().any():
         raise RuntimeError("training dataset has duplicate date rows after join")
 
-    out = PROCESSED_DIR / "training_dataset.parquet"
+    out = plant_processed_dir / "training_dataset.parquet"
     df.to_parquet(out, index=False)
     log.info(
         "wrote %s: %d rows x %d cols, %s -> %s",
@@ -107,8 +109,14 @@ def _main() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.parse_args()
-    run()
+    parser.add_argument(
+        "--plant",
+        required=True,
+        choices=sorted(PLANTS),
+        help="Plant slug from ml/plants.py.",
+    )
+    args = parser.parse_args()
+    run(get_plant(args.plant))
 
 
 if __name__ == "__main__":

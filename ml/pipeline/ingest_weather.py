@@ -1,13 +1,16 @@
 """Open-Meteo customer-archive ingestion (Tier 2).
 
-Use when: rebuilding the daily weather feature table for Quad Cities from
-Open-Meteo's paid ERA5 archive. Run via `just features` (chains all Tier 2
-ingest scripts) or directly via `uv run python -m pipeline.ingest_weather`.
-CLI flag `--refresh` re-fetches every year, ignoring the on-disk cache.
+Use when: rebuilding the daily weather feature table for a given plant from
+Open-Meteo's paid ERA5 archive. Run via ``just features <slug>`` (chains
+all Tier 2 ingest scripts) or directly via
+``uv run python -m pipeline.ingest_weather --plant <slug>``.
+CLI flag ``--refresh`` re-fetches every year, ignoring the on-disk cache.
 
 Output:
-- data/raw/weather/{year}.parquet           (cached per-year hourly)
-- data/interim/weather_quad_cities.parquet  (daily aggregated, UTC)
+- data/raw/weather/<slug>/{year}.parquet     (cached per-year hourly,
+                                              namespaced per plant since
+                                              the lat/lon differs)
+- data/interim/weather_<slug>.parquet        (daily aggregated, UTC)
 """
 from __future__ import annotations
 
@@ -23,10 +26,9 @@ import requests
 from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from plants import PLANTS, Plant, get_plant  # noqa: E402
 from schemas import (  # noqa: E402
     OPENMETEO_ARCHIVE_URL,
-    QC1_LAT,
-    QC1_LON,
     WEATHER_ARCHIVE_END_LAG_DAYS,
     WEATHER_HOURLY_VARS,
 )
@@ -42,11 +44,20 @@ WEATHER_START_YEAR = 2005
 
 
 def _fetch_year(
-    year: int, lat: float, lon: float, apikey: str, refresh: bool
+    year: int,
+    plant_slug: str,
+    lat: float,
+    lon: float,
+    apikey: str,
+    refresh: bool,
 ) -> pd.DataFrame:
-    """Pull (or reuse cached) hourly weather for one year, return as DataFrame."""
-    RAW_DIR.mkdir(parents=True, exist_ok=True)
-    cache = RAW_DIR / f"{year}.parquet"
+    """Pull (or reuse cached) hourly weather for one year, return as DataFrame.
+
+    Cache is namespaced per plant slug since lat/lon differs between plants.
+    """
+    cache_dir = RAW_DIR / plant_slug
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache = cache_dir / f"{year}.parquet"
 
     today = datetime.now(timezone.utc).date()
     end_cap = today - timedelta(days=WEATHER_ARCHIVE_END_LAG_DAYS)
@@ -73,7 +84,8 @@ def _fetch_year(
         "apikey": apikey,
     }
     log.info(
-        "weather %d: fetching %s to %s (%d hourly vars)",
+        "weather %s %d: fetching %s to %s (%d hourly vars)",
+        plant_slug,
         year,
         start,
         end,
@@ -148,14 +160,21 @@ def _load_apikey() -> str:
     )
 
 
-def run(refresh: bool = False) -> None:
+def run(plant: Plant, refresh: bool = False) -> None:
     INTERIM_DIR.mkdir(parents=True, exist_ok=True)
     apikey = _load_apikey()
     current_year = datetime.now(timezone.utc).year
 
     frames: list[pd.DataFrame] = []
     for year in range(WEATHER_START_YEAR, current_year + 1):
-        df = _fetch_year(year, QC1_LAT, QC1_LON, apikey, refresh=refresh)
+        df = _fetch_year(
+            year,
+            plant_slug=plant.slug,
+            lat=plant.lat,
+            lon=plant.lon,
+            apikey=apikey,
+            refresh=refresh,
+        )
         if not df.empty:
             frames.append(df)
 
@@ -166,7 +185,7 @@ def run(refresh: bool = False) -> None:
     hourly = hourly.drop_duplicates(subset=["time"]).sort_values("time")
 
     daily = _aggregate_daily(hourly)
-    out = INTERIM_DIR / "weather_quad_cities.parquet"
+    out = INTERIM_DIR / f"weather_{plant.slug}.parquet"
     daily.to_parquet(out, index=False)
     log.info(
         "wrote %s: %d daily rows, %s -> %s",
@@ -184,12 +203,18 @@ def _main() -> None:
     )
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
+        "--plant",
+        required=True,
+        choices=sorted(PLANTS),
+        help="Plant slug from ml/plants.py.",
+    )
+    parser.add_argument(
         "--refresh",
         action="store_true",
         help="Re-fetch every year, ignoring cached hourly Parquet.",
     )
     args = parser.parse_args()
-    run(refresh=args.refresh)
+    run(get_plant(args.plant), refresh=args.refresh)
 
 
 if __name__ == "__main__":

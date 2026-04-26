@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "leaflet/dist/leaflet.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -49,6 +50,15 @@
 }
 
 :root {
+  /* University of Arizona palette: Cardinal Red (#AB0520) + Navy (#0C234B).
+   * Alert tier semantics (green/yellow/red) are kept separate so the UI
+   * still reads as traffic-light. */
+  --ua-red: #AB0520;
+  --ua-red-dark: #8B0420;
+  --ua-navy: #0C234B;
+  --ua-navy-dark: #061533;
+  --ua-cream: #F8F4EC;
+
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

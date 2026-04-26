@@ -1,11 +1,12 @@
-"""Train per-day point + quantile-band XGBoost models for QC1 (Tier 3).
+"""Train per-day point + quantile-band XGBoost models for a plant (Tier 3).
 
 Use when: producing the model artifacts and metrics report consumed by
-Tier 4 inference / backtest. Run via `just train` or
-`uv run python -m pipeline.train`.
+Tier 4 inference / backtest for a specific plant slug. Run via
+``just train <slug>`` or
+``uv run python -m pipeline.train --plant <slug>``.
 
 Pipeline:
-    1. Load data/processed/training_dataset.parquet.
+    1. Load data/processed/<slug>/training_dataset.parquet.
     2. For each horizon h in HORIZONS (1..14), build target = power_pct(t+h).
        Drop rows where the feature day or the target day is in
        is_outage / is_pre_outage, or where target is NaN.
@@ -18,12 +19,13 @@ Pipeline:
     5. Score the point model and three baselines on val and test, broken
        out by full / summer-only / non-summer slices. Report empirical
        coverage of the [p10, p90] band on test.
-    6. Persist:
-         data/artifacts/model_h{H}_point.json    (14 boosters)
-         data/artifacts/model_h{H}_q{10,90}.json (28 boosters)
-         data/artifacts/feature_columns.json     (column order contract)
-         data/artifacts/metrics.json             (model + baselines)
-         data/artifacts/shap_summary_h7.png      (point h=7 model)
+    6. Persist (under data/artifacts/<slug>/):
+         model_h{H}_point.json    (14 boosters)
+         model_h{H}_q{10,90}.json (28 boosters when both quantiles are fit)
+         feature_columns.json     (column order contract)
+         metrics.json             (model + baselines)
+         band_deltas.json         (per-horizon symmetric band delta)
+         shap_summary_h7.png      (point h=7 model)
 
 Re-running is idempotent — all outputs are overwritten in place.
 """
@@ -44,6 +46,7 @@ import pandas as pd
 import xgboost as xgb
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from plants import PLANTS, Plant, get_plant  # noqa: E402
 from schemas import (  # noqa: E402
     BAND_TARGET_COVERAGE,
     CATEGORICAL_FEATURES,
@@ -222,24 +225,26 @@ def _save_shap(model: xgb.XGBRegressor, X: pd.DataFrame, out_path: Path) -> None
 # ---------- main ---------------------------------------------------------
 
 
-def run() -> None:
-    ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+def run(plant: Plant) -> None:
+    artifacts_dir = ARTIFACTS_DIR / plant.slug
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-    src = PROCESSED_DIR / "training_dataset.parquet"
+    src = PROCESSED_DIR / plant.slug / "training_dataset.parquet"
     if not src.exists():
-        raise FileNotFoundError(f"missing {src}; run `just features` first")
+        raise FileNotFoundError(f"missing {src}; run `just features {plant.slug}` first")
     raw = pd.read_parquet(src)
     raw["date"] = pd.to_datetime(raw["date"]).dt.tz_localize(None).dt.normalize()
     raw = _coerce_categoricals(raw)
     log.info(
-        "loaded %d rows %s -> %s",
+        "[%s] loaded %d rows %s -> %s",
+        plant.slug,
         len(raw),
         raw["date"].min().date(),
         raw["date"].max().date(),
     )
 
     feat_cols = _feature_cols(raw)
-    (ARTIFACTS_DIR / "feature_columns.json").write_text(json.dumps(feat_cols, indent=2))
+    (artifacts_dir / "feature_columns.json").write_text(json.dumps(feat_cols, indent=2))
     log.info("feature matrix has %d columns", len(feat_cols))
 
     metrics: dict[str, object] = {
@@ -272,7 +277,8 @@ def run() -> None:
 
         log.info("  fit point (mean)")
         point_model = _fit_point(X_train, y_train, X_val, y_val)
-        point_model.save_model(str(ARTIFACTS_DIR / f"model_h{h:02d}_point.json"))
+        point_path = artifacts_dir / f"model_h{h:02d}_point.json"
+        point_model.save_model(str(point_path))
 
         point_pred_val = point_model.predict(X_val)
         point_pred_test = point_model.predict(X_test)
@@ -336,7 +342,7 @@ def run() -> None:
             shap_point_model = point_model
             shap_X_test = X_test
 
-    out_metrics = ARTIFACTS_DIR / "metrics.json"
+    out_metrics = artifacts_dir / "metrics.json"
     out_metrics.write_text(json.dumps(metrics, indent=2, default=float))
     log.info("wrote %s", out_metrics)
 
@@ -350,13 +356,13 @@ def run() -> None:
         }
         for h_key, block in metrics["horizons"].items()
     }
-    out_deltas = ARTIFACTS_DIR / "band_deltas.json"
+    out_deltas = artifacts_dir / "band_deltas.json"
     out_deltas.write_text(json.dumps(deltas, indent=2, default=float))
     log.info("wrote %s", out_deltas)
 
     if shap_point_model is not None and shap_X_test is not None and len(shap_X_test):
         try:
-            shap_path = ARTIFACTS_DIR / f"shap_summary_h{SHAP_HORIZON}.png"
+            shap_path = artifacts_dir / f"shap_summary_h{SHAP_HORIZON}.png"
             _save_shap(shap_point_model, shap_X_test, shap_path)
             log.info("wrote %s", shap_path)
         except Exception as exc:  # SHAP+categorical can be finicky; non-fatal
@@ -369,8 +375,14 @@ def _main() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.parse_args()
-    run()
+    parser.add_argument(
+        "--plant",
+        required=True,
+        choices=sorted(PLANTS),
+        help="Plant slug from ml/plants.py.",
+    )
+    args = parser.parse_args()
+    run(get_plant(args.plant))
 
 
 if __name__ == "__main__":

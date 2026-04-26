@@ -1,14 +1,18 @@
 """NRC daily power-status ingestion (Tier 1).
 
-Use when: rebuilding the label timeseries for any reactor from the NRC public
-daily power-status reports. Run end-to-end via `just ingest-labels` from the
-`ml/` directory; CLI flag `--refresh` forces re-download of every cached year.
+Use when: rebuilding the label timeseries for a given plant from the NRC
+public daily power-status reports. Run end-to-end via
+``just ingest-labels <slug>`` from the repo root, or
+``uv run python -m pipeline.ingest_nrc --plant <slug>``.
+CLI flag ``--refresh`` forces re-download of every cached year.
 
 Output:
-- data/raw/nrc/{year}.txt        (cached per-year source files)
-- data/interim/nrc_power_status.parquet      (all units, all years)
-- data/interim/labels_quad_cities_1.parquet  (Quad Cities 1 only, with is_outage)
-- ml/notebooks/figures/qc1_power_history.png (sanity plot)
+- data/raw/nrc/{year}.txt                       (cached per-year source files,
+                                                 shared across plants)
+- data/interim/nrc_power_status.parquet         (all units, all years)
+- data/interim/labels_<slug>.parquet            (this plant only, with
+                                                 is_outage / is_pre_outage)
+- ml/notebooks/figures/<slug>_power_history.png (sanity plot)
 """
 from __future__ import annotations
 
@@ -22,10 +26,10 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-# Allow `python -m pipeline.ingest_nrc` to import sibling `schemas.py` at ml/.
+# Allow `python -m pipeline.ingest_nrc` to import sibling modules at ml/.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from plants import PLANTS, Plant, get_plant  # noqa: E402
 from schemas import (  # noqa: E402
-    CANONICAL_UNIT_QC1,
     NRC_EARLIEST_YEAR,
     OUTAGE_MIN_CONSECUTIVE_DAYS,
     PRE_OUTAGE_LOOKBACK_DAYS,
@@ -49,11 +53,15 @@ NRC_URL = (
 
 MIN_PARSE_RATE = 0.95  # Acceptance bar from the project plan.
 
-# Defensive Quad Cities 1 matcher: case-insensitive, whitespace-tolerant. Used
-# only to validate that the canonical unit name resolves to exactly one row
-# per (date, unit) — the actual filter is an equality check on the canonical
-# string after normalization.
-QC1_MATCHER = re.compile(r"^\s*quad\s*cities\s*1\s*$", re.IGNORECASE)
+
+def _unit_matcher(unit_name: str) -> re.Pattern[str]:
+    """Build a case-insensitive, whitespace-tolerant regex for the canonical
+    unit string. Used only to validate that the unit appears in the file —
+    the actual filter is an equality check after normalization.
+    """
+    parts = re.split(r"\s+", unit_name.strip())
+    pattern = r"^\s*" + r"\s*".join(re.escape(p) for p in parts) + r"\s*$"
+    return re.compile(pattern, re.IGNORECASE)
 
 
 def _fetch_year(year: int, refresh: bool) -> Path | None:
@@ -85,11 +93,11 @@ def _fetch_year(year: int, refresh: bool) -> Path | None:
     return cache
 
 
-def _parse_year(path: Path, year: int) -> pd.DataFrame:
+def _parse_year(path: Path, year: int, sentinel_matcher: re.Pattern[str]) -> pd.DataFrame:
     """Parse one cached NRC file. Logs and skips malformed rows.
 
     Asserts >=95% of non-blank, non-header lines parse cleanly and that the
-    canonical Quad Cities 1 unit appears at least once.
+    sentinel unit (the active plant being ingested) appears at least once.
     """
     raw_lines = path.read_text().splitlines()
     rows: list[tuple[date, str, int]] = []
@@ -138,8 +146,10 @@ def _parse_year(path: Path, year: int) -> pd.DataFrame:
         )
 
     df = pd.DataFrame(rows, columns=["date", "unit", "power_pct"])
-    if not df["unit"].str.match(QC1_MATCHER).any():
-        raise RuntimeError(f"nrc {year}: canonical unit '{CANONICAL_UNIT_QC1}' missing")
+    if not df["unit"].str.match(sentinel_matcher).any():
+        raise RuntimeError(
+            f"nrc {year}: sentinel unit pattern {sentinel_matcher.pattern!r} not found"
+        )
     return df
 
 
@@ -243,17 +253,18 @@ def _add_is_pre_outage(
     return df
 
 
-def _coverage_report(df_qc1: pd.DataFrame) -> float:
-    """Log year-by-year coverage for QC1; return overall coverage fraction."""
-    if df_qc1.empty:
+def _coverage_report(df_unit: pd.DataFrame, label: str) -> float:
+    """Log year-by-year coverage for the plant's labels; return overall fraction."""
+    if df_unit.empty:
         return 0.0
-    start = df_qc1["date"].min().date()
-    end = df_qc1["date"].max().date()
+    start = df_unit["date"].min().date()
+    end = df_unit["date"].max().date()
     expected = pd.date_range(start, end, freq="D")
-    have = df_qc1.set_index("date").reindex(expected)
+    have = df_unit.set_index("date").reindex(expected)
     overall = have["power_pct"].notna().mean()
     log.info(
-        "QC1 coverage: %d / %d days (%.2f%%) from %s to %s",
+        "%s coverage: %d / %d days (%.2f%%) from %s to %s",
+        label,
         have["power_pct"].notna().sum(),
         len(expected),
         overall * 100,
@@ -270,8 +281,8 @@ def _coverage_report(df_qc1: pd.DataFrame) -> float:
     return float(overall)
 
 
-def _render_sanity_plot(df_qc1: pd.DataFrame, out: Path) -> None:
-    """Render the QC1 capacity-factor sanity plot to PNG."""
+def _render_sanity_plot(df_unit: pd.DataFrame, display_name: str, out: Path) -> None:
+    """Render the per-plant capacity-factor sanity plot to PNG."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -279,8 +290,8 @@ def _render_sanity_plot(df_qc1: pd.DataFrame, out: Path) -> None:
 
     out.parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(14, 4))
-    ax.plot(df_qc1["date"], df_qc1["power_pct"], linewidth=0.6, color="#1f3b73")
-    pre = df_qc1[df_qc1["is_pre_outage"]]
+    ax.plot(df_unit["date"], df_unit["power_pct"], linewidth=0.6, color="#1f3b73")
+    pre = df_unit[df_unit["is_pre_outage"]]
     if not pre.empty:
         ax.scatter(
             pre["date"],
@@ -289,7 +300,7 @@ def _render_sanity_plot(df_qc1: pd.DataFrame, out: Path) -> None:
             color="#e67e22",
             label="is_pre_outage (coastdown)",
         )
-    outages = df_qc1[df_qc1["is_outage"]]
+    outages = df_unit[df_unit["is_outage"]]
     if not outages.empty:
         ax.scatter(
             outages["date"],
@@ -300,7 +311,7 @@ def _render_sanity_plot(df_qc1: pd.DataFrame, out: Path) -> None:
         )
     if not pre.empty or not outages.empty:
         ax.legend(loc="lower left", fontsize=8)
-    ax.set_title("Quad Cities 1 — daily power output (% of full)")
+    ax.set_title(f"{display_name} — daily power output (% of full)")
     ax.set_xlabel("Date (UTC)")
     ax.set_ylabel("Power %")
     ax.set_ylim(-5, 110)
@@ -311,16 +322,17 @@ def _render_sanity_plot(df_qc1: pd.DataFrame, out: Path) -> None:
     log.info("wrote sanity plot: %s", out)
 
 
-def run(refresh: bool = False) -> None:
+def run(plant: Plant, refresh: bool = False) -> None:
     INTERIM_DIR.mkdir(parents=True, exist_ok=True)
     current_year = datetime.now(timezone.utc).year
+    matcher = _unit_matcher(plant.nrc_unit_name)
 
     frames: list[pd.DataFrame] = []
     for year in range(NRC_EARLIEST_YEAR, current_year + 1):
         path = _fetch_year(year, refresh=refresh)
         if path is None:
             continue
-        frames.append(_parse_year(path, year))
+        frames.append(_parse_year(path, year, matcher))
 
     if not frames:
         raise RuntimeError("no NRC years successfully ingested")
@@ -347,19 +359,24 @@ def run(refresh: bool = False) -> None:
         all_units["date"].max().date(),
     )
 
-    qc1 = all_units[all_units["unit"].str.match(QC1_MATCHER)].copy()
-    qc1["unit"] = CANONICAL_UNIT_QC1
-    if qc1["unit"].nunique() != 1:
-        raise RuntimeError("QC1 filter resolved to multiple units")
-    out_qc1 = INTERIM_DIR / "labels_quad_cities_1.parquet"
-    qc1.to_parquet(out_qc1, index=False)
-    log.info("wrote %s: %d rows", out_qc1, len(qc1))
+    sub = all_units[all_units["unit"].str.match(matcher)].copy()
+    sub["unit"] = plant.nrc_unit_name
+    if sub["unit"].nunique() != 1:
+        raise RuntimeError(f"unit filter for {plant.slug} resolved to multiple units")
+    out_unit = INTERIM_DIR / f"labels_{plant.slug}.parquet"
+    sub.to_parquet(out_unit, index=False)
+    log.info("wrote %s: %d rows", out_unit, len(sub))
 
-    coverage = _coverage_report(qc1)
+    coverage = _coverage_report(sub, plant.display_name)
     if coverage < 0.99:
-        log.warning("QC1 coverage %.2f%% below 99%% acceptance bar", coverage * 100)
+        log.warning(
+            "%s coverage %.2f%% below 99%% acceptance bar",
+            plant.display_name,
+            coverage * 100,
+        )
 
-    _render_sanity_plot(qc1, FIGURES_DIR / "qc1_power_history.png")
+    fig_path = FIGURES_DIR / f"{plant.slug}_power_history.png"
+    _render_sanity_plot(sub, plant.display_name, fig_path)
 
 
 def _main() -> None:
@@ -369,12 +386,18 @@ def _main() -> None:
     )
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
+        "--plant",
+        required=True,
+        choices=sorted(PLANTS),
+        help="Plant slug from ml/plants.py.",
+    )
+    parser.add_argument(
         "--refresh",
         action="store_true",
         help="Re-download every year, ignoring the on-disk cache.",
     )
     args = parser.parse_args()
-    run(refresh=args.refresh)
+    run(get_plant(args.plant), refresh=args.refresh)
 
 
 if __name__ == "__main__":

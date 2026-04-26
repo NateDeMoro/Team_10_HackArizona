@@ -1,20 +1,23 @@
 """Feature engineering for the daily training dataset (Tier 2).
 
 Use when: building wet-bulb / heat-index derived columns and lag/rolling
-features on top of the daily weather + water tables. Run via `just features`
-or `uv run python -m pipeline.features`. Reads:
-    data/interim/weather_quad_cities.parquet
-    data/interim/water_quad_cities.parquet
+features on top of the daily weather + water tables for a given plant.
+Run via ``just features <slug>`` or
+``uv run python -m pipeline.features --plant <slug>``.
+
+Reads:
+    data/interim/weather_<slug>.parquet
+    data/interim/water_<slug>.parquet
 Writes:
-    data/interim/features_quad_cities.parquet
+    data/interim/features_<slug>.parquet
 
 Wet-bulb uses the Stull (2011) empirical fit; heat index uses the NWS
 Rothfusz formula (with the Steadman low-T/RH adjustment skipped — at
-hackathon scale the standard form is fine and was hand-checked against the
-NWS table). Both are computed from daily-mean temperature and RH; the
-hourly-resolution refinement is left for a future iteration (a daily-mean
-wet-bulb under-estimates daily-max stress by ~1-2 deg C, but the rolling
-windows downstream wash most of that out).
+hackathon scale the standard form is fine and was hand-checked against
+the NWS table). Both are computed from daily-mean temperature and RH;
+the hourly-resolution refinement is left for a future iteration (a
+daily-mean wet-bulb under-estimates daily-max stress by ~1-2 deg C, but
+the rolling windows downstream wash most of that out).
 """
 from __future__ import annotations
 
@@ -27,6 +30,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from plants import PLANTS, Plant, get_plant  # noqa: E402
 from schemas import HEAT_DOSE_BASE_C, LAG_DAYS, ROLLING_CLOSED, ROLLING_WINDOWS  # noqa: E402
 
 log = logging.getLogger(__name__)
@@ -183,10 +187,10 @@ def _validate_dates(df: pd.DataFrame) -> None:
         raise RuntimeError(f"date column has {dups} duplicates")
 
 
-def run() -> None:
+def run(plant: Plant) -> None:
     INTERIM_DIR.mkdir(parents=True, exist_ok=True)
-    weather_path = INTERIM_DIR / "weather_quad_cities.parquet"
-    water_path = INTERIM_DIR / "water_quad_cities.parquet"
+    weather_path = INTERIM_DIR / f"weather_{plant.slug}.parquet"
+    water_path = INTERIM_DIR / f"water_{plant.slug}.parquet"
     if not weather_path.exists():
         raise FileNotFoundError(f"missing {weather_path}; run ingest_weather first")
     if not water_path.exists():
@@ -199,9 +203,10 @@ def run() -> None:
     weather["date"] = pd.to_datetime(weather["date"]).dt.tz_localize(None).dt.normalize()
     water["date"] = pd.to_datetime(water["date"]).dt.tz_localize(None).dt.normalize()
 
-    # water_site_id is carried as a categorical so the model can learn the
-    # ~0.75 deg C systematic offset between the two gauges (05420500 Clinton
-    # vs 05420400 Dam 13). Tier 3 will set XGBoost enable_categorical=True.
+    # water_site_id is carried as a categorical so the model can learn any
+    # systematic offset between gauges when a plant stitches multiple
+    # sources. For single-gauge plants the column is constant and XGBoost
+    # ignores it.
     water_cols = ["date", "water_temp_c", "streamflow_cfs"]
     if "water_site_id" in water.columns:
         water_cols.append("water_site_id")
@@ -217,7 +222,7 @@ def run() -> None:
     df = _add_seasonality(df)
     _validate_dates(df)
 
-    out = INTERIM_DIR / "features_quad_cities.parquet"
+    out = INTERIM_DIR / f"features_{plant.slug}.parquet"
     df.to_parquet(out, index=False)
     log.info(
         "wrote %s: %d rows x %d cols, %s -> %s",
@@ -235,8 +240,14 @@ def _main() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.parse_args()
-    run()
+    parser.add_argument(
+        "--plant",
+        required=True,
+        choices=sorted(PLANTS),
+        help="Plant slug from ml/plants.py.",
+    )
+    args = parser.parse_args()
+    run(get_plant(args.plant))
 
 
 if __name__ == "__main__":
