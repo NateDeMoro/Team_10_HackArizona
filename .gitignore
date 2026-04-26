@@ -33,3 +33,6 @@ ml/data/artifacts/*/attributions_latest.json
 .DS_Store
 .vscode/
 .idea/
+
+# Local docs (not tracked)
+docs/
