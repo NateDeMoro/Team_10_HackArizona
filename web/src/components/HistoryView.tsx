@@ -151,7 +151,23 @@ export function HistoryView({ plantId, height = 300 }: Props) {
     return out;
   }, [today]);
 
-  const refuelSegments = useMemo(() => buildRefuelArea(points), [points]);
+  // Fold the refuel-shade value into the main row so the chart has a
+  // single data source. Passing a separate `data` prop to the <Area>
+  // makes Recharts concatenate that array's X categories onto the
+  // axis, doubling the tick count and causing the dates to "loop"
+  // (Feb 1..Feb 26 then Feb 3..Feb 28 across the same width).
+  const chartData = useMemo(
+    () =>
+      (points ?? []).map((p) => ({
+        ...p,
+        refuel: p.is_outage ? Y_MAX : null,
+      })),
+    [points],
+  );
+  const hasRefuel = useMemo(
+    () => (points ?? []).some((p) => p.is_outage),
+    [points],
+  );
 
   return (
     <div className="flex flex-col gap-3">
@@ -198,7 +214,7 @@ export function HistoryView({ plantId, height = 300 }: Props) {
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
-              data={points}
+              data={chartData}
               margin={{ top: 16, right: 24, bottom: 8, left: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
@@ -228,10 +244,9 @@ export function HistoryView({ plantId, height = 300 }: Props) {
                 strokeOpacity={0.5}
                 strokeDasharray="2 4"
               />
-              {refuelSegments.length > 0 ? (
+              {hasRefuel ? (
                 <Area
-                  data={refuelSegments}
-                  dataKey="value"
+                  dataKey="refuel"
                   type="linear"
                   fill={COLOR_RED}
                   fillOpacity={0.18}
@@ -263,16 +278,6 @@ export function HistoryView({ plantId, height = 300 }: Props) {
       </p>
     </div>
   );
-}
-
-function buildRefuelArea(
-  points: HistoryPoint[] | null,
-): { date: string; value: number | null }[] {
-  if (!points) return [];
-  return points.map((p) => ({
-    date: p.date,
-    value: p.is_outage ? Y_MAX : null,
-  }));
 }
 
 function Legend() {

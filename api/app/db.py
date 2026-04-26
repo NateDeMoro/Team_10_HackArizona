@@ -23,6 +23,12 @@ _TTL_SECONDS = 300
 _cache: dict[tuple[str, str], tuple[float, bytes]] = {}
 
 
+def clear_cache() -> None:
+    """Drop every cached blob. Use when the refresher has just written new
+    artifacts so the next request re-fetches fresh bytes."""
+    _cache.clear()
+
+
 def _conn() -> psycopg.Connection:
     url = os.environ.get("DATABASE_URL")
     if not url:
@@ -30,6 +36,21 @@ def _conn() -> psycopg.Connection:
             "DATABASE_URL not set; link the Postgres addon to this Railway service"
         )
     return psycopg.connect(url)
+
+
+def latest_refreshed_at() -> object | None:
+    """Most recent ``refreshed_at`` across all artifacts, or None on miss/error.
+
+    Used by the api startup watcher to detect when the daily cron has just
+    written fresh blobs so the cache can be invalidated and prewarmed.
+    """
+    try:
+        with _conn() as conn, conn.cursor() as cur:
+            cur.execute("SELECT MAX(refreshed_at) FROM forecast_artifacts")
+            row = cur.fetchone()
+    except Exception:
+        return None
+    return row[0] if row else None
 
 
 def fetch_artifact(plant_id: str, artifact_type: str) -> bytes:
