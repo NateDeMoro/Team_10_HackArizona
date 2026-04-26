@@ -128,6 +128,29 @@ export type BacktestSeriesResponse = {
   points: BacktestSeriesPoint[];
 };
 
+// --- History (calendar month) ---------------------------------------------
+
+export type DipCategory =
+  | "operational"
+  | "weather_dependent"
+  | "non_weather_dependent"
+  | "refueling";
+
+export type HistoryPoint = {
+  date: string;
+  power_pct: number;
+  is_outage: boolean;
+  prediction_pct: number | null;
+  dip_category: DipCategory;
+};
+
+export type HistoryResponse = {
+  plant_id: string;
+  year: number;
+  month: number;
+  points: HistoryPoint[];
+};
+
 // --- Health ---------------------------------------------------------------
 
 export type Health = { status: string };
@@ -184,6 +207,11 @@ export const getBacktestDates = (plantId: string) =>
 export const getBacktest = (plantId: string, asOf: string) =>
   getJson<BacktestResponse>(
     `/plants/${encodeURIComponent(plantId)}/backtest?as_of=${asOf}`,
+  );
+
+export const getHistoryMonth = (plantId: string, year: number, month: number) =>
+  getJson<HistoryResponse>(
+    `/plants/${encodeURIComponent(plantId)}/history?year=${year}&month=${month}`,
   );
 
 export const getBacktestSeries = (

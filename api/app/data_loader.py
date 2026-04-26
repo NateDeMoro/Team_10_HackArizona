@@ -140,6 +140,76 @@ def load_recent_actuals(slug: str, days: int) -> list[dict]:
     return rows
 
 
+def load_history_month(slug: str, year: int, month: int) -> list[dict]:
+    """Every calendar day in (year, month) with realization, horizon-7
+    backtest prediction (if any), and a dip category.
+
+    Refueling / pre-outage rows surface as power_pct=0 with is_outage=True
+    so the chart can render an explicit "Refueling" red floor instead of
+    a gap. Dip category combines actual + prediction:
+      - refueling: is_outage row
+      - non_weather_dependent: power < 90 and prediction >= 95 (model
+        saw no weather signal but reality dipped)
+      - weather_dependent: any other sub-95 day, including pre-2023
+        dates with no backtest prediction to make a claim either way
+      - operational: power >= 95 and not in outage
+    """
+    _ensure_supported(slug)
+    df = _fetch_parquet(slug, "labels")
+    df["date"] = pd.to_datetime(df["date"]).dt.date
+    df = df[
+        df["date"].apply(lambda d: d.year == year and d.month == month)
+    ].sort_values("date")
+
+    pred_by_date: dict[date, float] = {}
+    try:
+        bdf = _fetch_parquet(slug, "backtest_results")[
+            ["horizon", "target_date", "point"]
+        ]
+        bdf = bdf[bdf["horizon"] == 7].copy()
+        bdf["target_date"] = pd.to_datetime(bdf["target_date"]).dt.date
+        bdf = bdf[
+            bdf["target_date"].apply(
+                lambda d: d.year == year and d.month == month
+            )
+        ]
+        for r in bdf.to_dict(orient="records"):
+            pred_by_date[r["target_date"]] = float(r["point"])
+    except FileNotFoundError:
+        pass
+
+    rows: list[dict] = []
+    for r in df.to_dict(orient="records"):
+        is_outage = bool(r.get("is_outage")) or bool(r.get("is_pre_outage"))
+        raw_power = r.get("power_pct")
+        prediction = pred_by_date.get(r["date"])
+        if is_outage:
+            power_pct = 0.0
+            category = "refueling"
+        else:
+            power_pct = (
+                float(raw_power)
+                if raw_power is not None and not pd.isna(raw_power)
+                else 0.0
+            )
+            if power_pct >= 95:
+                category = "operational"
+            elif power_pct < 90 and prediction is not None and prediction >= 95:
+                category = "non_weather_dependent"
+            else:
+                category = "weather_dependent"
+        rows.append(
+            {
+                "date": r["date"],
+                "power_pct": power_pct,
+                "is_outage": is_outage,
+                "prediction_pct": prediction,
+                "dip_category": category,
+            }
+        )
+    return rows
+
+
 def load_recent_inputs(slug: str, days: int) -> list[dict]:
     """Join the trailing N days of weather + water inputs for sparklines."""
     _ensure_supported(slug)

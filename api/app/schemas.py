@@ -474,3 +474,54 @@ class BacktestSeriesResponse(BaseModel):
     plant_id: str
     horizon_days: int
     points: list[BacktestSeriesPoint]
+
+
+DipCategory = Literal[
+    "operational",
+    "weather_dependent",
+    "non_weather_dependent",
+    "refueling",
+]
+
+
+class HistoryPoint(BaseModel):
+    """One day in the History month view.
+
+    `power_pct` is forced to 0 on refueling/pre-outage days (rather than
+    null) so the calendar chart can render an explicit "Refueling" red
+    band at the floor instead of a confusing gap.
+    """
+
+    date: date
+    power_pct: float = Field(
+        ...,
+        description=(
+            "Realized capacity factor (0-100). 0 on refueling/pre-outage "
+            "days."
+        ),
+    )
+    is_outage: bool
+    prediction_pct: float | None = Field(
+        None,
+        description=(
+            "Backtested point prediction at horizon=7 for this date, if "
+            "available."
+        ),
+    )
+    dip_category: DipCategory = Field(
+        ...,
+        description=(
+            "operational / weather_dependent / non_weather_dependent / "
+            "refueling. non_weather_dependent flags days where the "
+            "model predicted no dip (>=95) but realization fell below 90."
+        ),
+    )
+
+
+class HistoryResponse(BaseModel):
+    """All days in a single calendar month for the History view."""
+
+    plant_id: str
+    year: int
+    month: int
+    points: list[HistoryPoint]

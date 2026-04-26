@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import actuals, attributions, backtest, forecast, inputs, plants
+from app.routes import actuals, attributions, backtest, forecast, history, inputs, plants
 
 app = FastAPI(title="Derating Forecast API", version="0.1.0")
 
@@ -24,3 +24,4 @@ app.include_router(backtest.router)
 app.include_router(actuals.router)
 app.include_router(inputs.router)
 app.include_router(attributions.router)
+app.include_router(history.router)

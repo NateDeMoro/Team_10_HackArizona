@@ -466,3 +466,64 @@ class BacktestSeriesResponse(BaseModel):
     plant_id: str
     horizon_days: int
     points: list[BacktestSeriesPoint]
+
+
+# Dip categories surfaced by the History month endpoint. Used to color
+# the calendar-month chart so the operator can tell at a glance whether
+# a derate was driven by weather (model also dipped), an unmodeled
+# operational cause (model said no dip but realization dropped anyway),
+# or a planned refueling outage (excluded from training, plotted at 0).
+DipCategory = Literal[
+    "operational",
+    "weather_dependent",
+    "non_weather_dependent",
+    "refueling",
+]
+
+
+class HistoryPoint(BaseModel):
+    """One day in the History month view.
+
+    `power_pct` is forced to 0 on refueling/pre-outage days (rather than
+    null) so the calendar chart can render an explicit "Refueling" red
+    band at the floor instead of a confusing gap.
+    """
+
+    date: date
+    power_pct: float = Field(
+        ...,
+        description=(
+            "Realized capacity factor (0-100). 0 on refueling/pre-outage "
+            "days; the is_outage flag distinguishes those from genuine "
+            "weather-driven zeros."
+        ),
+    )
+    is_outage: bool
+    prediction_pct: float | None = Field(
+        None,
+        description=(
+            "Backtested point prediction at horizon=7 for this date, if "
+            "available. Backtest coverage starts 2023-01-01; earlier "
+            "dates return null."
+        ),
+    )
+    dip_category: DipCategory = Field(
+        ...,
+        description=(
+            "operational: power >= 95 and not in outage. "
+            "refueling: is_outage=True. "
+            "non_weather_dependent: power < 90 and the model predicted "
+            ">= 95 (model saw no weather signal but reality dipped). "
+            "weather_dependent: any other dip (model also predicted a "
+            "dip, or no backtest prediction available so no claim made)."
+        ),
+    )
+
+
+class HistoryResponse(BaseModel):
+    """All days in a single calendar month for the History view."""
+
+    plant_id: str
+    year: int
+    month: int
+    points: list[HistoryPoint]
