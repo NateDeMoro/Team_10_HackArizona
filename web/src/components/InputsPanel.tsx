@@ -84,7 +84,7 @@ export function InputsPanel({ points }: Props) {
         return (
           <div key={s.label} className="flex flex-col gap-1">
             <div className="flex items-baseline justify-between text-xs">
-              <span className="text-[var(--ua-navy)]/70">{s.label}</span>
+              <span className="text-[var(--ua-navy)]">{s.label}</span>
               <span className="font-mono text-[var(--ua-navy)]">
                 {fmtNumber(last, 1)} {s.unit}
               </span>

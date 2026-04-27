@@ -163,7 +163,7 @@ export function ForecastView({ forecast, runDate, height = 300 }: Props) {
             label={{
               value: "watch ≥ 95%",
               fill: COLOR_YELLOW,
-              fillOpacity: 0.85,
+              fillOpacity: 1,
               fontSize: 10,
               position: "insideBottomRight",
             }}
@@ -176,7 +176,7 @@ export function ForecastView({ forecast, runDate, height = 300 }: Props) {
             label={{
               value: "alert < 90%",
               fill: COLOR_RED,
-              fillOpacity: 0.85,
+              fillOpacity: 1,
               fontSize: 10,
               position: "insideBottomRight",
             }}

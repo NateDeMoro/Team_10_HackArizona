@@ -25,7 +25,7 @@ export function AttributionBars({
   const labelWidth = compact ? "w-36" : "w-56";
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between text-xs text-[var(--ua-navy)]/60">
+      <div className="flex items-baseline justify-between text-xs text-[var(--ua-navy)]/90">
         <span>
           Baseline{" "}
           <span className="font-mono text-[var(--ua-navy)]">
@@ -45,7 +45,7 @@ export function AttributionBars({
           return (
             <li key={f.feature} className="flex items-center gap-2 text-xs">
               <span
-                className={`${labelWidth} truncate text-[var(--ua-navy)]/80`}
+                className={`${labelWidth} truncate text-[var(--ua-navy)]`}
                 title={f.feature}
               >
                 {featureLabel(f.feature)}

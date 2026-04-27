@@ -15,9 +15,17 @@ export const ALERT_HEX: Record<AlertLevel, string> = {
 };
 
 export const ALERT_BG: Record<AlertLevel, string> = {
-  operational: "bg-green-100 text-green-800 ring-green-300",
-  watch: "bg-yellow-100 text-yellow-800 ring-yellow-300",
-  alert: "bg-[#AB0520]/10 text-[#AB0520] ring-[#AB0520]/40",
+  operational: "bg-green-200 text-green-900 ring-green-500",
+  watch: "bg-yellow-200 text-yellow-900 ring-yellow-500",
+  alert: "bg-[#AB0520]/15 text-[#AB0520] ring-[#AB0520]/60",
+};
+
+// Tinted card background for plant tiles — fill is one step lighter than
+// the border so the box reads as a clear shape on the page.
+export const ALERT_CARD_BG: Record<AlertLevel, string> = {
+  operational: "bg-green-200 border-green-600 hover:border-green-800",
+  watch: "bg-yellow-200 border-yellow-600 hover:border-yellow-800",
+  alert: "bg-[#AB0520]/20 border-[#AB0520]/70 hover:border-[#AB0520]",
 };
 
 // Brand chart colors (used by ForecastChart).

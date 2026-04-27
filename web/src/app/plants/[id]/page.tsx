@@ -145,7 +145,7 @@ export default async function PlantDetail({
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-4">
         <div className="flex min-w-0 flex-col gap-6 lg:col-span-3">
-          <div className="min-w-0 rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm">
+          <div className="min-w-0 rounded-xl border border-[var(--ua-navy)]/25 bg-[#dbe8f7] p-4 shadow-sm">
             <div className="mb-3 flex items-baseline justify-between gap-3">
               <ViewToggle plantId={plant.id} active={view} />
               {forecast ? (
@@ -169,7 +169,7 @@ export default async function PlantDetail({
           </div>
 
           <div className="grid min-w-0 grid-cols-1 gap-6 md:grid-cols-3">
-            <div className="min-w-0 rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm md:col-span-2">
+            <div className="min-w-0 rounded-xl border border-[var(--ua-navy)]/25 bg-[#dbe8f7] p-4 shadow-sm md:col-span-2">
               <div className="mb-3 flex items-baseline justify-between gap-2">
                 <h2 className="text-sm font-semibold text-[var(--ua-navy)]">
                   Top features driving the 7-day forecast
@@ -190,7 +190,7 @@ export default async function PlantDetail({
               )}
             </div>
 
-            <div className="min-w-0 rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm">
+            <div className="min-w-0 rounded-xl border border-[var(--ua-navy)]/25 bg-[#dbe8f7] p-4 shadow-sm">
               <div className="mb-3 flex flex-col gap-0.5">
                 <h2 className="text-sm font-semibold text-[var(--ua-navy)]">
                   Weather inputs feeding the 14-day forecast

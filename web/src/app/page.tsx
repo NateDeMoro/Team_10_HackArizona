@@ -8,12 +8,14 @@ import {
   type AlertLevel,
   type Plant,
 } from "@/lib/api";
-import { ALERT_HEX, fmtDate } from "@/lib/format";
+import { ALERT_CARD_BG, ALERT_HEX, fmtDate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-// Per-plant 7-day headline derived from each modeled plant's forecast.
-// Shared between the map (badge color), the cards, and the legend.
+// Per-plant 14-day worst-case headline derived from each modeled plant's
+// forecast. Shared between the map (badge color), the cards, and the
+// legend. `pointPct` is the lowest point estimate across all horizons,
+// and `level` is that horizon's tier.
 export type ForecastSummary = {
   level: AlertLevel;
   runDate: string;
@@ -35,15 +37,16 @@ async function fetchCatalog(): Promise<Catalog> {
     modeled.map(async (p): Promise<[string, ForecastSummary] | null> => {
       try {
         const fc = await getForecast(p.id);
-        const h7 =
-          fc.horizons.find((h) => h.horizon_days === 7) ?? fc.horizons[0];
-        if (!h7) return null;
+        if (fc.horizons.length === 0) return null;
+        const worst = fc.horizons.reduce((lo, h) =>
+          h.point_pct < lo.point_pct ? h : lo,
+        );
         return [
           p.id,
           {
-            level: h7.alert_level,
+            level: worst.alert_level,
             runDate: fc.run_date,
-            pointPct: h7.point_pct,
+            pointPct: worst.point_pct,
           },
         ];
       } catch {
@@ -104,18 +107,21 @@ export default async function Home() {
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {modeled.map((p) => {
             const summary = summaries[p.id];
+            const tint = summary
+              ? ALERT_CARD_BG[summary.level]
+              : "bg-white border-[var(--ua-navy)]/15 hover:border-[var(--ua-red)]";
             return (
             <li key={p.id}>
               <Link
                 href={`/plants/${p.id}`}
-                className="group block rounded-xl border border-[var(--ua-navy)]/15 bg-white p-4 shadow-sm transition hover:border-[var(--ua-red)] hover:shadow-md"
+                className={`group block rounded-xl border p-4 shadow-sm transition hover:shadow-md ${tint}`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-sm font-semibold text-[var(--ua-navy)] group-hover:text-[var(--ua-red)]">
+                    <p className="text-sm font-bold text-[var(--ua-navy)] group-hover:text-[var(--ua-red)]">
                       {p.display_name}
                     </p>
-                    <p className="text-xs text-[var(--ua-navy)]/60">
+                    <p className="text-xs font-medium text-[var(--ua-navy)]">
                       {[p.operator, p.river, p.state]
                         .filter(Boolean)
                         .join(" · ")}
@@ -123,9 +129,9 @@ export default async function Home() {
                   </div>
                   {summary ? <AlertBadge level={summary.level} /> : null}
                 </div>
-                <p className="mt-3 text-xs text-[var(--ua-navy)]/60">
-                  7-day point forecast ·{" "}
-                  <span className="font-mono text-[var(--ua-navy)]">
+                <p className="mt-3 text-xs font-semibold text-[var(--ua-navy)]">
+                  14-day forecast low point ·{" "}
+                  <span className="font-mono font-bold text-[var(--ua-navy)]">
                     {summary == null
                       ? "no forecast cached"
                       : `${summary.pointPct.toFixed(1)}%`}
