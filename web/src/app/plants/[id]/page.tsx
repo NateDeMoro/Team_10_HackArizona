@@ -98,7 +98,7 @@ export default async function PlantDetail({
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-10">
         <Link
           href="/"
-          className="text-xs text-[var(--ua-navy)]/60 hover:text-[var(--ua-red)]"
+          className="text-xs text-[var(--ua-navy)]/85 hover:text-[var(--ua-red)]"
         >
           ← back to catalog
         </Link>
@@ -106,9 +106,9 @@ export default async function PlantDetail({
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--ua-navy)]">
             {plant.display_name}
           </h1>
-          <p className="text-sm text-[var(--ua-navy)]/60">{meta}</p>
+          <p className="text-sm text-[var(--ua-navy)]/85">{meta}</p>
         </header>
-        <div className="rounded-xl border border-dashed border-[var(--ua-navy)]/30 bg-[var(--ua-navy)]/[0.03] p-6 text-sm text-[var(--ua-navy)]/80">
+        <div className="rounded-xl border border-dashed border-[var(--ua-navy)]/40 bg-[var(--ua-navy)]/[0.05] p-6 text-sm text-[var(--ua-navy)]">
           Model coming soon. v1 only serves predictions for Quad Cities Unit 1;
           this plant is shown as a catalog placeholder so the map reflects
           the full US fleet.
@@ -121,7 +121,7 @@ export default async function PlantDetail({
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-10">
       <Link
         href="/"
-        className="text-xs text-[var(--ua-navy)]/60 hover:text-[var(--ua-red)]"
+        className="text-xs text-[var(--ua-navy)]/85 hover:text-[var(--ua-red)]"
       >
         ← back to catalog
       </Link>
@@ -131,12 +131,12 @@ export default async function PlantDetail({
           <h1 className="text-2xl font-semibold tracking-tight text-[var(--ua-navy)]">
             {plant.display_name}
           </h1>
-          <p className="text-sm text-[var(--ua-navy)]/60">{meta}</p>
+          <p className="text-sm text-[var(--ua-navy)]/85">{meta}</p>
         </div>
         {headlineHorizon ? (
           <div className="flex flex-col items-end gap-1">
             <AlertBadge level={headlineHorizon.alert_level} />
-            <span className="text-xs text-[var(--ua-navy)]/60">
+            <span className="text-xs text-[var(--ua-navy)]/85">
               7-day point: {headlineHorizon.point_pct.toFixed(1)}%
             </span>
           </div>
@@ -149,7 +149,7 @@ export default async function PlantDetail({
             <div className="mb-3 flex items-baseline justify-between gap-3">
               <ViewToggle plantId={plant.id} active={view} />
               {forecast ? (
-                <span className="text-xs text-[var(--ua-navy)]/60">
+                <span className="text-xs text-[var(--ua-navy)]/85">
                   Run {fmtDate(forecast.run_date)} · source {forecast.source}
                 </span>
               ) : null}
@@ -174,7 +174,7 @@ export default async function PlantDetail({
                 <h2 className="text-sm font-semibold text-[var(--ua-navy)]">
                   Top features driving the 7-day forecast
                 </h2>
-                <span className="text-xs text-[var(--ua-navy)]/60">
+                <span className="text-xs text-[var(--ua-navy)]/85">
                   SHAP, capacity-factor pp
                 </span>
               </div>
@@ -195,7 +195,7 @@ export default async function PlantDetail({
                 <h2 className="text-sm font-semibold text-[var(--ua-navy)]">
                   Weather inputs feeding the 14-day forecast
                 </h2>
-                <span className="text-[11px] text-[var(--ua-navy)]/60">
+                <span className="text-[11px] text-[var(--ua-navy)]/85">
                   Trailing 30-day conditions the model uses to project the
                   next 14 days
                 </span>
@@ -214,7 +214,7 @@ export default async function PlantDetail({
         </aside>
       </section>
 
-      <footer className="border-t-2 border-[var(--ua-red)]/30 pt-6 text-xs text-[var(--ua-navy)]/70">
+      <footer className="border-t-2 border-[var(--ua-red)]/30 pt-6 text-xs text-[var(--ua-navy)]">
         Forecast curves above 95% mean the model expects no weather-driven
         derating and are clamped to 100% on the chart; values below 90%
         trigger the red alert tier. Refueling outage and pre-outage days
@@ -256,7 +256,7 @@ function ViewToggle({ plantId, active }: { plantId: string; active: View }) {
 
 function NoData({ label }: { label: string }) {
   return (
-    <div className="rounded-md bg-[var(--ua-navy)]/[0.03] p-4 text-xs text-[var(--ua-navy)]/70">
+    <div className="rounded-md bg-[var(--ua-navy)]/[0.05] p-4 text-xs text-[var(--ua-navy)]">
       Missing {label}. Run <code className="font-mono">just forecast</code> /{" "}
       <code className="font-mono">just backtest</code> on the operator&apos;s
       machine to refresh the artifacts the API serves.
