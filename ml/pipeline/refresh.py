@@ -67,6 +67,13 @@ def _run(*cmd: str) -> None:
 
 
 def _refresh_plant(slug: str) -> None:
+    # NRC labels advance the History view's right edge. Best-effort: if the
+    # fetch or parse fails, fall through to features/build_dataset against
+    # yesterday's labels parquet rather than blanking today's forecast.
+    try:
+        _run(sys.executable, "-m", "pipeline.ingest_nrc", "--plant", slug)
+    except subprocess.CalledProcessError:
+        log.exception("[%s] NRC ingest failed (non-fatal, using cached labels)", slug)
     _run(sys.executable, "-m", "pipeline.ingest_weather", "--plant", slug)
     _run(sys.executable, "-m", "pipeline.ingest_usgs", "--plant", slug)
     _run(sys.executable, "-m", "pipeline.features", "--plant", slug)
